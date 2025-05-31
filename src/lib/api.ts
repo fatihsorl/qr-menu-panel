@@ -292,24 +292,38 @@ export const menuService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // Create data'ya ownerId ekle
+      // API'nin beklediği formata göre payload hazırla
       const createPayload = {
-        ...menuData,
-        ownerId: userId,
+        id: userId, // API'nin beklediği id field'ı - ownerId yerine
+        name: menuData.title, // API'nin beklediği name field'ı - title yerine
+        description: menuData.description,
+        imageUrl: menuData.imageUrl || "", // Boş string yerine undefined göndermemek için
+        language: menuData.language,
       };
 
       console.log("📡 API çağrısı: POST /api/base/menu (CREATE)");
-      console.log("📦 Payload:", createPayload);
+      console.log("📦 SWAGGER UYUMLU PAYLOAD:");
+      console.log("- id (ownerId):", createPayload.id);
+      console.log("- name (title):", createPayload.name);
+      console.log("- description:", createPayload.description);
+      console.log("- imageUrl:", createPayload.imageUrl);
+      console.log("- language:", createPayload.language);
 
       const response = await api.post("/api/base/menu", createPayload);
       console.log("✅ Menü oluşturma başarılı:", response.data);
       return response.data;
     } catch (error: any) {
-      console.error(
-        "❌ Menü oluşturma hatası:",
-        error.response?.status,
-        error.response?.data
-      );
+      console.error("❌ MENÜ OLUŞTURMA HATA DETAYLARI:");
+      console.error("- Status:", error.response?.status);
+      console.error("- Response Data:", error.response?.data);
+
+      if (error.response?.data?.errors) {
+        console.error("🚨 VALIDATION ERRORS:");
+        Object.keys(error.response.data.errors).forEach((field) => {
+          console.error(`- ${field}:`, error.response.data.errors[field]);
+        });
+      }
+
       throw error;
     }
   },
@@ -342,14 +356,17 @@ export const menuService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // Update data'ya ownerId ekle
+      // API'nin beklediği formata göre payload hazırla
       const updatePayload = {
-        ...menuData,
-        ownerId: userId,
+        id: menuData.id, // Mevcut menünün ID'si
+        name: menuData.title, // API'nin beklediği name field'ı
+        description: menuData.description,
+        imageUrl: menuData.imageUrl || "",
+        language: menuData.language,
       };
 
       console.log("📡 API çağrısı: POST /api/base/menu (UPDATE)");
-      console.log("📦 Payload:", updatePayload);
+      console.log("📦 Update Payload:", updatePayload);
 
       const response = await api.post("/api/base/menu", updatePayload);
       console.log("✅ Menü güncelleme başarılı:", response.data);
@@ -559,7 +576,7 @@ export const categoryService = {
   getCategoriesByMenuId: async (
     menuId: string
   ): Promise<ApiResponse<Category[]>> => {
-    console.log("��️ Kategori API çağrısı başlatılıyor...");
+    console.log("🔍 Kategori API çağrısı başlatılıyor...");
     console.log("📝 Menu ID:", menuId);
 
     // Token kontrolü
