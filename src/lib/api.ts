@@ -100,7 +100,7 @@ export const authService = {
           console.log(`📄 İçerik:`, text.substring(0, 200));
         }
       } catch (error: any) {
-        console.log(`❌ ${endpoint} hata:`, error.message);
+        console.log(`❌ ${endpoint} hata:`, error);
       }
     }
   },
@@ -229,7 +229,7 @@ export const menuService = {
       );
 
       // Token decode hatası
-      if (error.message?.includes("Token")) {
+      if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
           "Giriş bilgileriniz geçersiz. Lütfen tekrar giriş yapın."
@@ -237,14 +237,14 @@ export const menuService = {
       }
 
       // Hata detayları
-      if (error.response) {
-        console.error("📄 Response Headers:", error.response.headers);
-        console.error("📊 Response Status:", error.response.status);
-        console.error("💬 Response Message:", error.response.data?.message);
+      if (error instanceof Response) {
+        console.error("📄 Response Headers:", error.headers);
+        console.error("📊 Response Status:", error.status);
+        console.error("💬 Response Message:", error.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
-      if (error.response?.status === 400) {
+      if (error instanceof Response && error.status === 400) {
         console.warn("⚠️  400 hatası alındı, boş array döndürülüyor");
         return {
           isSucceed: true,
@@ -426,7 +426,7 @@ export const menuService = {
       } catch (detailError: any) {
         console.warn(
           "⚠️ Menü detay kontrolü başarısız, silme işlemine devam:",
-          detailError.message
+          detailError
         );
       }
 
@@ -448,18 +448,31 @@ export const menuService = {
         console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
         return deleteResponse.data;
       } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError.message);
+        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
         console.error("🚨 DELETE ERROR DETAILS:");
-        console.error("- Status:", deleteError.response?.status);
-        console.error("- Status Text:", deleteError.response?.statusText);
-        console.error("- Response Data:", deleteError.response?.data);
-        console.error("- Response Headers:", deleteError.response?.headers);
+        console.error(
+          "- Status:",
+          deleteError instanceof Response ? deleteError.status : "Unknown"
+        );
+        console.error(
+          "- Status Text:",
+          deleteError instanceof Response ? deleteError.statusText : "Unknown"
+        );
+        console.error(
+          "- Response Data:",
+          deleteError instanceof Response ? deleteError.data : "Unknown"
+        );
+        console.error(
+          "- Response Headers:",
+          deleteError instanceof Response ? deleteError.headers : "Unknown"
+        );
 
         // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
         if (
-          deleteError.code === "NETWORK_ERROR" ||
-          deleteError.response?.status === 404 ||
-          deleteError.response?.status === 405
+          deleteError instanceof Error &&
+          (deleteError.code === "NETWORK_ERROR" ||
+            (deleteError instanceof Response && deleteError.status === 404) ||
+            (deleteError instanceof Response && deleteError.status === 405))
         ) {
           console.log(
             "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
@@ -490,7 +503,7 @@ export const menuService = {
       );
 
       // Network Error detayları
-      if (error.code === "NETWORK_ERROR") {
+      if (error instanceof Error && error.code === "NETWORK_ERROR") {
         console.error("🌐 NETWORK ERROR detayları:");
         console.error("- Base URL:", BASE_URL);
         console.error("- Tam URL:", `${BASE_URL}/api/base/menu/${menuId}`);
@@ -503,12 +516,12 @@ export const menuService = {
       }
 
       // HTTP hata kodları
-      if (error.response?.status === 403) {
+      if (error instanceof Response && error.status === 403) {
         // 403 için daha detaylı bilgi
         console.error("🚫 403 FORBIDDEN DETAYLARI:");
         console.error("- Bu menü size ait değil veya silme yetkiniz yok");
         console.error("- API ownership kontrolü başarısız");
-        console.error("- Sunucu yanıtı:", error.response?.data);
+        console.error("- Sunucu yanıtı:", error.data);
 
         throw new Error(
           "Bu menüyü silme yetkiniz yok! Sadece kendi oluşturduğunuz menüleri silebilirsiniz. " +
@@ -516,13 +529,13 @@ export const menuService = {
         );
       }
 
-      if (error.response?.status === 404) {
+      if (error instanceof Response && error.status === 404) {
         throw new Error(
           "Menü bulunamadı. Bu menü daha önce silinmiş olabilir."
         );
       }
 
-      if (error.response?.status === 405) {
+      if (error instanceof Response && error.status === 405) {
         throw new Error(
           "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
         );
@@ -530,9 +543,11 @@ export const menuService = {
 
       // Genel hata
       throw new Error(
-        error.response?.data?.message ||
-          error.message ||
-          "Menü silinirken beklenmeyen bir hata oluştu"
+        error instanceof Response
+          ? error.data?.message || "Menü silinirken beklenmeyen bir hata oluştu"
+          : error instanceof Error
+          ? error.message || "Menü silinirken beklenmeyen bir hata oluştu"
+          : "Menü silinirken beklenmeyen bir hata oluştu"
       );
     }
   },
@@ -544,7 +559,7 @@ export const categoryService = {
   getCategoriesByMenuId: async (
     menuId: string
   ): Promise<ApiResponse<Category[]>> => {
-    console.log("🗂️ Kategori API çağrısı başlatılıyor...");
+    console.log("��️ Kategori API çağrısı başlatılıyor...");
     console.log("📝 Menu ID:", menuId);
 
     // Token kontrolü
@@ -598,7 +613,7 @@ export const categoryService = {
       );
 
       // Token decode hatası
-      if (error.message?.includes("Token")) {
+      if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
           "Giriş bilgileriniz geçersiz. Lütfen tekrar giriş yapın."
@@ -606,14 +621,14 @@ export const categoryService = {
       }
 
       // Hata detayları
-      if (error.response) {
-        console.error("📄 Response Headers:", error.response.headers);
-        console.error("📊 Response Status:", error.response.status);
-        console.error("💬 Response Message:", error.response.data?.message);
+      if (error instanceof Response) {
+        console.error("📄 Response Headers:", error.headers);
+        console.error("📊 Response Status:", error.status);
+        console.error("💬 Response Message:", error.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
-      if (error.response?.status === 400) {
+      if (error instanceof Response && error.status === 400) {
         console.warn("⚠️  Kategori 400 hatası alındı, boş array döndürülüyor");
         return {
           isSucceed: true,
@@ -689,13 +704,14 @@ export const categoryService = {
         console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
         return deleteResponse.data;
       } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError.message);
+        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
 
         // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
         if (
-          deleteError.code === "NETWORK_ERROR" ||
-          deleteError.response?.status === 404 ||
-          deleteError.response?.status === 405
+          deleteError instanceof Error &&
+          (deleteError.code === "NETWORK_ERROR" ||
+            (deleteError instanceof Response && deleteError.status === 404) ||
+            (deleteError instanceof Response && deleteError.status === 405))
         ) {
           console.log(
             "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
@@ -732,7 +748,7 @@ export const categoryService = {
       );
 
       // Network Error detayları
-      if (error.code === "NETWORK_ERROR") {
+      if (error instanceof Error && error.code === "NETWORK_ERROR") {
         console.error("🌐 NETWORK ERROR detayları:");
         console.error("- Base URL:", BASE_URL);
         console.error(
@@ -748,19 +764,19 @@ export const categoryService = {
       }
 
       // HTTP hata kodları
-      if (error.response?.status === 403) {
+      if (error instanceof Response && error.status === 403) {
         throw new Error(
           "Bu kategoriyi silme yetkiniz yok. Sadece kendi oluşturduğunuz kategorileri silebilirsiniz."
         );
       }
 
-      if (error.response?.status === 404) {
+      if (error instanceof Response && error.status === 404) {
         throw new Error(
           "Kategori bulunamadı. Bu kategori daha önce silinmiş olabilir."
         );
       }
 
-      if (error.response?.status === 405) {
+      if (error instanceof Response && error.status === 405) {
         throw new Error(
           "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
         );
@@ -768,9 +784,12 @@ export const categoryService = {
 
       // Genel hata
       throw new Error(
-        error.response?.data?.message ||
-          error.message ||
-          "Kategori silinirken beklenmeyen bir hata oluştu"
+        error instanceof Response
+          ? error.data?.message ||
+            "Kategori silinirken beklenmeyen bir hata oluştu"
+          : error instanceof Error
+          ? error.message || "Kategori silinirken beklenmeyen bir hata oluştu"
+          : "Kategori silinirken beklenmeyen bir hata oluştu"
       );
     }
   },
@@ -836,7 +855,7 @@ export const productService = {
       );
 
       // Token decode hatası
-      if (error.message?.includes("Token")) {
+      if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
           "Giriş bilgileriniz geçersiz. Lütfen tekrar giriş yapın."
@@ -844,14 +863,14 @@ export const productService = {
       }
 
       // Hata detayları
-      if (error.response) {
-        console.error("📄 Response Headers:", error.response.headers);
-        console.error("📊 Response Status:", error.response.status);
-        console.error("💬 Response Message:", error.response.data?.message);
+      if (error instanceof Response) {
+        console.error("📄 Response Headers:", error.headers);
+        console.error("📊 Response Status:", error.status);
+        console.error("💬 Response Message:", error.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
-      if (error.response?.status === 400) {
+      if (error instanceof Response && error.status === 400) {
         console.warn("⚠️  Ürün 400 hatası alındı, boş array döndürülüyor");
         return {
           isSucceed: true,
@@ -935,13 +954,14 @@ export const productService = {
         console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
         return deleteResponse.data;
       } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError.message);
+        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
 
         // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
         if (
-          deleteError.code === "NETWORK_ERROR" ||
-          deleteError.response?.status === 404 ||
-          deleteError.response?.status === 405
+          deleteError instanceof Error &&
+          (deleteError.code === "NETWORK_ERROR" ||
+            (deleteError instanceof Response && deleteError.status === 404) ||
+            (deleteError instanceof Response && deleteError.status === 405))
         ) {
           console.log(
             "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
@@ -978,7 +998,7 @@ export const productService = {
       );
 
       // Network Error detayları
-      if (error.code === "NETWORK_ERROR") {
+      if (error instanceof Error && error.code === "NETWORK_ERROR") {
         console.error("🌐 NETWORK ERROR detayları:");
         console.error("- Base URL:", BASE_URL);
         console.error(
@@ -994,19 +1014,19 @@ export const productService = {
       }
 
       // HTTP hata kodları
-      if (error.response?.status === 403) {
+      if (error instanceof Response && error.status === 403) {
         throw new Error(
           "Bu ürünü silme yetkiniz yok. Sadece kendi oluşturduğunuz ürünleri silebilirsiniz."
         );
       }
 
-      if (error.response?.status === 404) {
+      if (error instanceof Response && error.status === 404) {
         throw new Error(
           "Ürün bulunamadı. Bu ürün daha önce silinmiş olabilir."
         );
       }
 
-      if (error.response?.status === 405) {
+      if (error instanceof Response && error.status === 405) {
         throw new Error(
           "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
         );
@@ -1014,9 +1034,11 @@ export const productService = {
 
       // Genel hata
       throw new Error(
-        error.response?.data?.message ||
-          error.message ||
-          "Ürün silinirken beklenmeyen bir hata oluştu"
+        error instanceof Response
+          ? error.data?.message || "Ürün silinirken beklenmeyen bir hata oluştu"
+          : error instanceof Error
+          ? error.message || "Ürün silinirken beklenmeyen bir hata oluştu"
+          : "Ürün silinirken beklenmeyen bir hata oluştu"
       );
     }
   },

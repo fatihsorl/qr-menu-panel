@@ -1,37 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Edit, Trash2, Plus } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuthStore } from '@/lib/store';
 import { categoryService, menuService } from '@/lib/api';
-import { Category, Menu } from '@/lib/types';
+import { Category } from '@/lib/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+interface CategoryWithMenu extends Category {
+    menuTitle?: string;
+}
+
 export default function CategoriesPage() {
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [menus, setMenus] = useState<Menu[]>([]);
+    const [categories, setCategories] = useState<CategoryWithMenu[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuthStore();
 
-    useEffect(() => {
-        if (user) {
-            loadMenusAndCategories();
-        }
-    }, [user]);
-
-    const loadMenusAndCategories = async () => {
+    const loadMenusAndCategories = useCallback(async () => {
         try {
             setLoading(true);
             if (user) {
                 // Önce menüleri al
                 const menusResponse = await menuService.getMyMenus();
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
-                    setMenus(menusResponse.data);
-
                     // Her menü için kategorileri al
-                    const allCategories: Category[] = [];
+                    const allCategories: CategoryWithMenu[] = [];
                     for (const menu of menusResponse.data) {
                         try {
                             const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id);
@@ -43,20 +38,26 @@ export default function CategoriesPage() {
                                 }));
                                 allCategories.push(...categoriesWithMenu);
                             }
-                        } catch (error) {
+                        } catch {
                             console.log(`Menü ${menu.title} için kategori bulunamadı`);
                         }
                     }
                     setCategories(allCategories);
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Kategoriler yüklenirken hata:', error);
             toast.error('Kategoriler yüklenirken hata oluştu');
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (user) {
+            loadMenusAndCategories();
+        }
+    }, [user, loadMenusAndCategories]);
 
     const handleDeleteCategory = async (categoryId: string) => {
         if (window.confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) {
@@ -66,7 +67,7 @@ export default function CategoriesPage() {
                     toast.success('Kategori başarıyla silindi');
                     loadMenusAndCategories();
                 }
-            } catch (error) {
+            } catch {
                 toast.error('Kategori silinirken hata oluştu');
             }
         }
@@ -118,7 +119,7 @@ export default function CategoriesPage() {
                                                 <p className="text-gray-600 mt-1">{category.description}</p>
                                                 <div className="flex items-center mt-2 space-x-3">
                                                     <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                                        {(category as any).menuTitle || 'Bilinmeyen Menü'}
+                                                        {category.menuTitle || 'Bilinmeyen Menü'}
                                                     </span>
                                                     <span className="text-xs text-gray-500">
                                                         Kategori ID: {category.id}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store";
 import { authService } from "@/lib/api";
@@ -25,11 +24,14 @@ export const useAuth = () => {
       } else {
         toast.error("Giriş yapılırken hata oluştu!");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error); // Debug log
-      toast.error(
-        error?.response?.data?.message || "Giriş yapılırken hata oluştu!"
-      );
+      const errorMessage =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { message?: string } } })?.response
+              ?.data?.message || "Giriş yapılırken hata oluştu!"
+          : "Giriş yapılırken hata oluştu!";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -50,11 +52,14 @@ export const useAuth = () => {
       } else {
         toast.error("Kayıt olurken hata oluştu!");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Register error:", error); // Debug log
-      toast.error(
-        error?.response?.data?.message || "Kayıt olurken hata oluştu!"
-      );
+      const errorMessage =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { message?: string } } })?.response
+              ?.data?.message || "Kayıt olurken hata oluştu!"
+          : "Kayıt olurken hata oluştu!";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

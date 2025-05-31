@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, ChevronRight, Check, X, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronRight, Check, AlertTriangle } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuthStore } from '@/lib/store';
 import { menuService, categoryService, productService, authService } from '@/lib/api';
-import { Menu, Category, Product, CreateMenuData, CreateCategoryData, CreateProductData } from '@/lib/types';
+import { Menu, Category, CreateMenuData, CreateCategoryData, CreateProductData } from '@/lib/types';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
@@ -63,7 +63,7 @@ export default function DashboardPage() {
             } else {
                 toast.error(response.message || 'Menü oluşturulurken hata oluştu');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Menü oluşturma hatası:', error);
             toast.error('Menü oluşturulurken hata oluştu');
         } finally {
@@ -97,7 +97,7 @@ export default function DashboardPage() {
             } else {
                 toast.error(response.message || 'Kategori oluşturulurken hata oluştu');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Kategori oluşturma hatası:', error);
             toast.error('Kategori oluşturulurken hata oluştu');
         } finally {
@@ -131,7 +131,7 @@ export default function DashboardPage() {
             } else {
                 toast.error(response.message || 'Ürün oluşturulurken hata oluştu');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Ürün oluşturma hatası:', error);
             toast.error('Ürün oluşturulurken hata oluştu');
         } finally {
@@ -152,19 +152,19 @@ export default function DashboardPage() {
                         <h3 className="font-semibold text-gray-800 mb-2">📊 Menü Hiyerarşisi</h3>
                         <div className="text-sm text-gray-700 space-y-1">
                             <div className="flex items-center justify-center">
-                                <span className="bg-blue-100 px-2 py-1 rounded">📋 Menü: "Sıcak İçecekler"</span>
+                                <span className="bg-blue-100 px-2 py-1 rounded">📋 Menü: &quot;Sıcak İçecekler&quot;</span>
                             </div>
                             <div className="flex items-center justify-center">
                                 <span className="mx-2">├──</span>
-                                <span className="bg-green-100 px-2 py-1 rounded">🗂️ Kategori: "Kahveler"</span>
+                                <span className="bg-green-100 px-2 py-1 rounded">🗂️ Kategori: &quot;Kahveler&quot;</span>
                             </div>
                             <div className="flex items-center justify-center">
                                 <span className="mx-8">├──</span>
-                                <span className="bg-purple-100 px-2 py-1 rounded">☕ Ürün: "Latte - 25₺"</span>
+                                <span className="bg-purple-100 px-2 py-1 rounded">☕ Ürün: &quot;Latte - 25₺&quot;</span>
                             </div>
                             <div className="flex items-center justify-center">
                                 <span className="mx-8">└──</span>
-                                <span className="bg-purple-100 px-2 py-1 rounded">☕ Ürün: "Cappuccino - 23₺"</span>
+                                <span className="bg-purple-100 px-2 py-1 rounded">☕ Ürün: &quot;Cappuccino - 23₺&quot;</span>
                             </div>
                         </div>
                     </div>
@@ -199,153 +199,136 @@ export default function DashboardPage() {
 
                                 const cookieToken = document.cookie
                                     .split('; ')
-                                    .find(row => row.startsWith('accessToken='))
+                                    .find((row: string) => row.startsWith('accessToken='))
                                     ?.split('=')[1];
 
-                                console.log("Cookie'deki token:", cookieToken);
-                                console.log("Zustand'daki token:", user?.accessToken);
+                                console.log("🍪 Cookie Token:", cookieToken ? `${cookieToken.substring(0, 30)}...` : "YOK!");
 
-                                if (cookieToken !== user?.accessToken) {
-                                    console.warn("⚠️ Cookie ve Zustand token'ları farklı!");
+                                if (!cookieToken) {
+                                    console.error("❌ TOKEN YOK! Login olmanız gerekiyor.");
+                                    toast.error("Lütfen önce giriş yapın!");
+                                    return;
                                 }
-                            }}
-                            className="mr-3 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                        >
-                            Token Kontrolü
-                        </button>
-                        <button
-                            onClick={async () => {
-                                console.clear();
-                                await authService.testApiServer();
-                            }}
-                            className="mr-3 px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                        >
-                            API Sunucu Test Et
-                        </button>
-                        <button
-                            onClick={async () => {
-                                console.clear();
+
                                 try {
-                                    const result = await menuService.getMyMenus();
-                                    console.log("Menü API sonucu:", result);
-                                    toast.success("Konsola bak!");
+                                    console.log("🔍 API sunucu testi başlatılıyor...");
+                                    await authService.testApiServer();
                                 } catch (error) {
-                                    console.error("Menü API hatası:", error);
-                                    toast.error("API hatası!");
+                                    console.error("❌ API test hatası:", error);
                                 }
                             }}
-                            className="mr-3 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
                         >
-                            Menü API Test Et
+                            🧪 Token ve API Durumunu Test Et
                         </button>
-                        <p className="text-sm text-yellow-700">
-                            Bu butonlar konsola debug bilgileri yazacak. F12 ile konsolu açıp test et.
-                        </p>
+
+                        <button
+                            onClick={async () => {
+                                console.clear();
+                                console.log("🍔 MENÜ API TEST:");
+
+                                const cookieToken = document.cookie
+                                    .split('; ')
+                                    .find((row: string) => row.startsWith('accessToken='))
+                                    ?.split('=')[1];
+
+                                if (!cookieToken) {
+                                    console.error("❌ TOKEN YOK! Login olmanız gerekiyor.");
+                                    toast.error("Lütfen önce giriş yapın!");
+                                    return;
+                                }
+
+                                try {
+                                    const response = await menuService.getMyMenus();
+                                    console.log("✅ Menü API başarılı:", response);
+                                    toast.success(`Menü API çalışıyor! ${response.data.length} menü bulundu.`);
+                                } catch (error) {
+                                    console.error("❌ Menü API hatası:", error);
+                                    toast.error("Menü API hatası! Console'u kontrol edin.");
+                                }
+                            }}
+                            className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            🍔 Menü API Test Et
+                        </button>
                     </div>
                 </div>
 
                 {/* Progress Steps */}
-                <div className="flex items-center justify-center space-x-4">
-                    <div className={`flex items-center ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                            {currentStep > 1 ? <Check className="w-4 h-4" /> : '📋'}
+                <div className="flex items-center justify-center space-x-4 mb-8">
+                    {[1, 2, 3].map((step) => (
+                        <div key={step} className="flex items-center">
+                            <div className={`
+                                w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold
+                                ${currentStep >= step ? 'bg-blue-500' : 'bg-gray-300'}
+                                ${currentStep === step ? 'ring-4 ring-blue-200' : ''}
+                            `}>
+                                {currentStep > step ? <Check className="w-5 h-5" /> : step}
+                            </div>
+                            {step < 3 && (
+                                <ChevronRight className={`w-5 h-5 mx-2 ${currentStep > step ? 'text-blue-500' : 'text-gray-300'}`} />
+                            )}
                         </div>
-                        <span className="ml-2 font-medium">Ana Menü</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                    <div className={`flex items-center ${currentStep >= 2 ? 'text-green-600' : 'text-gray-400'}`}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-green-600 text-white' : 'bg-gray-200'}`}>
-                            {currentStep > 2 ? <Check className="w-4 h-4" /> : '🗂️'}
-                        </div>
-                        <span className="ml-2 font-medium">Kategoriler</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                    <div className={`flex items-center ${currentStep >= 3 ? 'text-purple-600' : 'text-gray-400'}`}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 3 ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}>
-                            🍽️
-                        </div>
-                        <span className="ml-2 font-medium">Ürünler</span>
-                    </div>
+                    ))}
                 </div>
 
-                {/* Step 1: Menü Oluşturma */}
+                {/* Step Content */}
                 {currentStep === 1 && (
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center mb-4">
-                            <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center mr-3">
-                                📋
-                            </div>
-                            <h2 className="text-xl font-bold">1. Ana Menü Oluşturun (En Üst Seviye)</h2>
-                        </div>
-                        <div className="bg-blue-50 p-3 rounded-lg mb-4">
-                            <p className="text-blue-800 text-sm">
-                                <strong>Ana Menü:</strong> Restoranınızın en üst seviye menüsüdür. Örn: "Sıcak İçecekler", "Ana Yemekler", "Tatlılar"
-                            </p>
-                        </div>
+                    <div className="bg-white rounded-lg shadow-md p-6">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">1️⃣ Menü Oluştur</h2>
+                        <p className="text-gray-600 mb-6">Önce ana menünüzü oluşturun</p>
+
                         <form onSubmit={handleCreateMenu} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label htmlFor="menu-title" className="block text-sm font-medium text-gray-700 mb-1">
                                     Menü Adı *
                                 </label>
                                 <input
+                                    id="menu-title"
                                     type="text"
-                                    required
                                     value={menuForm.title}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, title: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Örn: Sıcak İçecekler, Ana Yemekler, Tatlılar"
+                                    onChange={(e) => setMenuForm({ ...menuForm, title: e.target.value })}
+                                    placeholder="örn: Kahve Menüsü"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Menü Açıklaması *
+                                <label htmlFor="menu-description" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Açıklama *
                                 </label>
                                 <textarea
-                                    required
+                                    id="menu-description"
                                     value={menuForm.description}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, description: e.target.value }))}
+                                    onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })}
+                                    placeholder="Menünüz hakkında kısa bilgi"
                                     rows={3}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Örn: Sıcak ve aromatik içecek çeşitlerimiz. Kaliteli Arabica kahve çekirdekleri ile hazırlanır."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    required
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Menü Görseli (İsteğe bağlı)
+                                <label htmlFor="menu-image" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Görsel URL (opsiyonel)
                                 </label>
                                 <input
+                                    id="menu-image"
                                     type="url"
                                     value={menuForm.imageUrl}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="https://example.com/menu-image.jpg"
+                                    onChange={(e) => setMenuForm({ ...menuForm, imageUrl: e.target.value })}
+                                    placeholder="https://example.com/image.jpg"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Dil
-                                </label>
-                                <select
-                                    value={menuForm.language}
-                                    onChange={(e) => setMenuForm(prev => ({ ...prev, language: e.target.value }))}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    <option value="tr">Türkçe</option>
-                                    <option value="en">İngilizce</option>
-                                    <option value="de">Almanca</option>
-                                    <option value="fr">Fransızca</option>
-                                </select>
                             </div>
 
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white py-3 px-4 rounded-lg font-medium transition-colors"
                             >
-                                {loading ? 'Oluşturuluyor...' : '📋 Ana Menüyü Oluştur ve Kategorilere Geç'}
+                                {loading ? 'Oluşturuluyor...' : 'Menüyü Oluştur'}
                             </button>
                         </form>
                     </div>
@@ -370,7 +353,7 @@ export default function DashboardPage() {
                             </div>
                             <div className="bg-green-50 p-3 rounded-lg mb-4">
                                 <p className="text-green-800 text-sm">
-                                    <strong>Kategoriler:</strong> "{createdMenu?.title}" menüsünün alt kategorileridir. Örn: "Kahveler", "Çaylar", "Soğuk İçecekler"
+                                    <strong>Kategoriler:</strong> &quot;{createdMenu?.title}&quot; menüsünün alt kategorileridir. Örn: &quot;Kahveler&quot;, &quot;Çaylar&quot;, &quot;Soğuk İçecekler&quot;
                                 </p>
                             </div>
                             <form onSubmit={handleCreateCategory} className="space-y-4 mb-6">
@@ -428,10 +411,10 @@ export default function DashboardPage() {
                                 <>
                                     <div className="border-t pt-4">
                                         <h3 className="font-medium mb-3">
-                                            🗂️ "{createdMenu?.title}" menüsüne eklenen kategoriler ({categories.length})
+                                            🗂️ &quot;{createdMenu?.title}&quot; menüsüne eklenen kategoriler ({categories.length})
                                         </h3>
                                         <div className="space-y-2">
-                                            {categories.map((category, index) => (
+                                            {categories.map((category) => (
                                                 <div key={category.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                                     <div className="flex items-center">
                                                         <span className="mr-3 text-green-600">🗂️</span>
@@ -485,7 +468,7 @@ export default function DashboardPage() {
                                 </label>
                                 <div className="bg-purple-50 p-3 rounded-lg mb-2">
                                     <p className="text-purple-800 text-sm">
-                                        <strong>Ürünler:</strong> Seçili kategorinin içindeki satılacak ürünlerdir. Örn: "Latte", "Cappuccino", "Americano"
+                                        <strong>Ürünler:</strong> Seçili kategorinin içindeki satılacak ürünlerdir. Örn: &quot;Latte&quot;, &quot;Cappuccino&quot;, &quot;Americano&quot;
                                     </p>
                                 </div>
                                 <select
@@ -505,7 +488,7 @@ export default function DashboardPage() {
                             {selectedCategory && (
                                 <div className="bg-blue-50 p-3 rounded-lg mb-4">
                                     <p className="text-blue-800 text-sm">
-                                        <strong>📍 Seçili kategori:</strong> "{selectedCategory.name}" - Bu kategoriye ürün ekliyorsunuz
+                                        <strong>📍 Seçili kategori:</strong> &quot;{selectedCategory.name}&quot; - Bu kategoriye ürün ekliyorsunuz
                                     </p>
                                 </div>
                             )}
@@ -584,7 +567,7 @@ export default function DashboardPage() {
                             <div className="text-center">
                                 <h3 className="font-bold text-blue-800 mb-2">🎉 Tebrikler! Menü Hiyerarşiniz Hazır</h3>
                                 <div className="text-blue-800 space-y-1">
-                                    <p className="font-medium">📋 Ana Menü: "{createdMenu?.title}"</p>
+                                    <p className="font-medium">📋 Ana Menü: &quot;{createdMenu?.title}&quot;</p>
                                     <p>🗂️ {categories.length} kategori eklendi</p>
                                     <p className="text-sm">
                                         İstediğiniz kadar ürün eklemeye devam edebilir, yeni kategoriler oluşturabilirsiniz.

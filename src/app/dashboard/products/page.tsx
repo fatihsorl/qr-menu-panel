@@ -1,51 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Edit, Trash2, Plus } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useAuthStore } from '@/lib/store';
 import { productService, categoryService, menuService } from '@/lib/api';
-import { Product, Category, Menu } from '@/lib/types';
+import { Product } from '@/lib/types';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+interface ProductWithInfo extends Product {
+    categoryName?: string;
+    menuTitle?: string;
+}
+
 export default function ProductsPage() {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [menus, setMenus] = useState<Menu[]>([]);
+    const [products, setProducts] = useState<ProductWithInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuthStore();
 
-    useEffect(() => {
-        if (user) {
-            loadAllData();
-        }
-    }, [user]);
-
-    const loadAllData = async () => {
+    const loadAllData = useCallback(async () => {
         try {
             setLoading(true);
             if (user) {
                 // Önce menüleri al
                 const menusResponse = await menuService.getMyMenus();
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
-                    setMenus(menusResponse.data);
-
                     // Her menü için kategorileri al
-                    const allCategories: Category[] = [];
-                    const allProducts: Product[] = [];
+                    const allProducts: ProductWithInfo[] = [];
 
                     for (const menu of menusResponse.data) {
                         try {
                             const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id);
                             if (categoriesResponse.isSucceed) {
-                                // Her kategoriye menü bilgisini ekle
-                                const categoriesWithMenu = categoriesResponse.data.map(cat => ({
-                                    ...cat,
-                                    menuTitle: menu.title
-                                }));
-                                allCategories.push(...categoriesWithMenu);
-
                                 // Her kategori için ürünleri al
                                 for (const category of categoriesResponse.data) {
                                     try {
@@ -59,26 +46,31 @@ export default function ProductsPage() {
                                             }));
                                             allProducts.push(...productsWithInfo);
                                         }
-                                    } catch (error) {
+                                    } catch {
                                         console.log(`Kategori ${category.name} için ürün bulunamadı`);
                                     }
                                 }
                             }
-                        } catch (error) {
+                        } catch {
                             console.log(`Menü ${menu.title} için kategori bulunamadı`);
                         }
                     }
-                    setCategories(allCategories);
                     setProducts(allProducts);
                 }
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Ürünler yüklenirken hata:', error);
             toast.error('Ürünler yüklenirken hata oluştu');
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        if (user) {
+            loadAllData();
+        }
+    }, [user, loadAllData]);
 
     const handleDeleteProduct = async (productId: string) => {
         if (window.confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
@@ -88,7 +80,7 @@ export default function ProductsPage() {
                     toast.success('Ürün başarıyla silindi');
                     loadAllData();
                 }
-            } catch (error) {
+            } catch {
                 toast.error('Ürün silinirken hata oluştu');
             }
         }
@@ -150,10 +142,10 @@ export default function ProductsPage() {
                                                         {formatPrice(product.price)}
                                                     </span>
                                                     <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                                                        {(product as any).categoryName || 'Bilinmeyen Kategori'}
+                                                        {product.categoryName || 'Bilinmeyen Kategori'}
                                                     </span>
                                                     <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                                        {(product as any).menuTitle || 'Bilinmeyen Menü'}
+                                                        {product.menuTitle || 'Bilinmeyen Menü'}
                                                     </span>
                                                 </div>
                                                 <div className="mt-1">
