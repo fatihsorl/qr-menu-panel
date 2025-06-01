@@ -53,11 +53,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </button>
             </div>
 
-            {/* Sidebar */}
+            {/* Sidebar - DÜZELTME: Desktop'ta da fixed kalacak */}
             <div className={`
                 fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
                 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                lg:translate-x-0 lg:static lg:inset-0
+                lg:translate-x-0
             `}>
                 {/* Desktop Header */}
                 <div className="hidden lg:flex h-16 items-center justify-center border-b border-gray-200">
@@ -75,7 +75,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     </button>
                 </div>
 
-                <nav className="mt-8 px-4 pb-20 overflow-y-auto">
+                <nav className="mt-8 px-4 pb-36 overflow-y-auto">
                     <div className="space-y-2">
                         {navigation.map((item) => {
                             const IconComponent = item.icon;
