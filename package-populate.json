@@ -1,0 +1,12 @@
+{
+  "name": "qr-menu-data-populate",
+  "version": "1.0.0",
+  "description": "Script to populate QR Menu with sample data",
+  "main": "populate-data.js",
+  "scripts": {
+    "populate": "node populate-data.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}

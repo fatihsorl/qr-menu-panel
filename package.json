@@ -32,5 +32,10 @@
     "eslint-config-next": "15.3.3",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "description": "��#\u0000 \u0000q\u0000r\u0000-\u0000m\u0000e\u0000n\u0000u\u0000-\u0000p\u0000a\u0000n\u0000e\u0000l\u0000\r\u0000 \u0000",
+  "main": "populate-data.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

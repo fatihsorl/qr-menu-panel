@@ -240,11 +240,11 @@ export const menuService = {
       if (error instanceof Response) {
         console.error("📄 Response Headers:", error.headers);
         console.error("📊 Response Status:", error.status);
-        console.error("💬 Response Message:", error.data?.message);
+        console.error("💬 Response Message:", error.response?.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
-      if (error instanceof Response && error.status === 400) {
+      if (error.response?.status === 400) {
         console.warn("⚠️  400 hatası alındı, boş array döndürülüyor");
         return {
           isSucceed: true,
@@ -294,7 +294,6 @@ export const menuService = {
 
       // API'nin beklediği formata göre payload hazırla
       const createPayload = {
-        id: userId, // API'nin beklediği id field'ı - ownerId yerine
         name: menuData.title, // API'nin beklediği name field'ı - title yerine
         description: menuData.description,
         imageUrl: menuData.imageUrl || "", // Boş string yerine undefined göndermemek için
@@ -303,7 +302,6 @@ export const menuService = {
 
       console.log("📡 API çağrısı: POST /api/base/menu (CREATE)");
       console.log("📦 SWAGGER UYUMLU PAYLOAD:");
-      console.log("- id (ownerId):", createPayload.id);
       console.log("- name (title):", createPayload.name);
       console.log("- description:", createPayload.description);
       console.log("- imageUrl:", createPayload.imageUrl);
@@ -400,118 +398,23 @@ export const menuService = {
       }
 
       const tokenPayload = JSON.parse(atob(tokenParts[1]));
-      console.log("🔍 DELETE OWNERSHIP DEBUG:");
-      console.log("📜 Full Token Payload:", tokenPayload);
-
       const userId =
         tokenPayload[
           "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
         ];
 
-      console.log("👤 Extracted User ID:", userId);
-      console.log("🗑️ Target Menu ID:", menuId);
-
       if (!userId) {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // Önce menü sahibini kontrol edelim
-      console.log("🔍 OWNERSHIP KONTROLÜ BAŞLIYOR...");
-      try {
-        const menuDetailResponse = await api.get(
-          `/api/base/menu-detail/${menuId}`
-        );
-        console.log("📋 Menü detayları:", menuDetailResponse.data);
+      console.log("👤 User ID:", userId);
 
-        if (menuDetailResponse.data?.data?.ownerId) {
-          console.log(
-            "🔑 Menü Sahibi ID:",
-            menuDetailResponse.data.data.ownerId
-          );
-          console.log("👤 Token User ID:", userId);
-          console.log(
-            "🤝 Ownership Eşleşiyor mu?",
-            menuDetailResponse.data.data.ownerId === userId
-          );
+      // API dokümantasyonuna göre POST metodu ile silme
+      console.log("📡 API çağrısı:", `POST /api/base/delete-menu/${menuId}`);
 
-          if (menuDetailResponse.data.data.ownerId !== userId) {
-            throw new Error(
-              `Bu menüyü silme yetkiniz yok! Menü sahibi: ${menuDetailResponse.data.data.ownerId}, Sizin ID: ${userId}`
-            );
-          }
-        }
-      } catch (detailError: any) {
-        console.warn(
-          "⚠️ Menü detay kontrolü başarısız, silme işlemine devam:",
-          detailError
-        );
-      }
-
-      // İlk olarak DELETE metodu deneyelim
-      console.log("🔥 Method 1: DELETE metodu deneniyor...");
-      const params = new URLSearchParams({
-        ownerId: userId,
-      });
-
-      console.log(
-        "📡 DELETE API çağrısı:",
-        `DELETE /api/base/menu/${menuId}?${params.toString()}`
-      );
-
-      try {
-        const deleteResponse = await api.delete(
-          `/api/base/menu/${menuId}?${params.toString()}`
-        );
-        console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
-        return deleteResponse.data;
-      } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
-        console.error("🚨 DELETE ERROR DETAILS:");
-        console.error(
-          "- Status:",
-          deleteError instanceof Response ? deleteError.status : "Unknown"
-        );
-        console.error(
-          "- Status Text:",
-          deleteError instanceof Response ? deleteError.statusText : "Unknown"
-        );
-        console.error(
-          "- Response Data:",
-          deleteError instanceof Response ? deleteError.data : "Unknown"
-        );
-        console.error(
-          "- Response Headers:",
-          deleteError instanceof Response ? deleteError.headers : "Unknown"
-        );
-
-        // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
-        if (
-          deleteError instanceof Error &&
-          (deleteError.code === "NETWORK_ERROR" ||
-            (deleteError instanceof Response && deleteError.status === 404) ||
-            (deleteError instanceof Response && deleteError.status === 405))
-        ) {
-          console.log(
-            "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
-          );
-
-          // POST ile silme işlemi
-          const deletePayload = {
-            id: menuId,
-            ownerId: userId,
-            isDeleted: true, // Silindi olarak işaretle
-          };
-
-          console.log("📡 POST API çağrısı:", "POST /api/base/menu (DELETE)");
-          console.log("📦 Payload:", deletePayload);
-
-          const postResponse = await api.post("/api/base/menu", deletePayload);
-          console.log("✅ POST metodu başarılı:", postResponse.data);
-          return postResponse.data;
-        }
-
-        throw deleteError; // Başka bir hata varsa yeniden fırlat
-      }
+      const response = await api.post(`/api/base/delete-menu/${menuId}`);
+      console.log("✅ Menü silme başarılı:", response.data);
+      return response.data;
     } catch (error: any) {
       console.error(
         "❌ Menü silme hatası:",
@@ -519,52 +422,24 @@ export const menuService = {
         error.response?.data
       );
 
-      // Network Error detayları
-      if (error instanceof Error && error.code === "NETWORK_ERROR") {
-        console.error("🌐 NETWORK ERROR detayları:");
-        console.error("- Base URL:", BASE_URL);
-        console.error("- Tam URL:", `${BASE_URL}/api/base/menu/${menuId}`);
-        console.error("- Token mevcut:", !!token);
-        console.error("- Tarayıcı network sekmesini kontrol edin");
-
-        throw new Error(
-          "Ağ bağlantısı hatası! API sunucusuna erişilemiyor. Lütfen internet bağlantınızı kontrol edin veya sunucu yöneticisi ile iletişime geçin."
-        );
-      }
-
       // HTTP hata kodları
-      if (error instanceof Response && error.status === 403) {
-        // 403 için daha detaylı bilgi
-        console.error("🚫 403 FORBIDDEN DETAYLARI:");
-        console.error("- Bu menü size ait değil veya silme yetkiniz yok");
-        console.error("- API ownership kontrolü başarısız");
-        console.error("- Sunucu yanıtı:", error.data);
-
+      if (error.response?.status === 403) {
         throw new Error(
-          "Bu menüyü silme yetkiniz yok! Sadece kendi oluşturduğunuz menüleri silebilirsiniz. " +
-            "Ownership problemi olabilir - console'da detayları kontrol edin."
+          "Bu menüyü silme yetkiniz yok. Sadece kendi oluşturduğunuz menüleri silebilirsiniz."
         );
       }
 
-      if (error instanceof Response && error.status === 404) {
+      if (error.response?.status === 404) {
         throw new Error(
           "Menü bulunamadı. Bu menü daha önce silinmiş olabilir."
         );
       }
 
-      if (error instanceof Response && error.status === 405) {
-        throw new Error(
-          "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
-        );
-      }
-
       // Genel hata
       throw new Error(
-        error instanceof Response
-          ? error.data?.message || "Menü silinirken beklenmeyen bir hata oluştu"
-          : error instanceof Error
-          ? error.message || "Menü silinirken beklenmeyen bir hata oluştu"
-          : "Menü silinirken beklenmeyen bir hata oluştu"
+        error.response?.data?.message ||
+          error.message ||
+          "Menü silinirken beklenmeyen bir hata oluştu"
       );
     }
   },
@@ -641,12 +516,12 @@ export const categoryService = {
       if (error instanceof Response) {
         console.error("📄 Response Headers:", error.headers);
         console.error("📊 Response Status:", error.status);
-        console.error("💬 Response Message:", error.data?.message);
+        console.error("💬 Response Message:", error.response?.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
-      if (error instanceof Response && error.status === 400) {
-        console.warn("⚠️  Kategori 400 hatası alındı, boş array döndürülüyor");
+      if (error.response?.status === 400) {
+        console.warn("⚠️  400 hatası alındı, boş array döndürülüyor");
         return {
           isSucceed: true,
           message: "Bu menüde henüz kategori bulunmuyor",
@@ -703,60 +578,19 @@ export const categoryService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // İlk olarak DELETE metodu deneyelim
-      console.log("🔥 Method 1: DELETE metodu deneniyor...");
-      const params = new URLSearchParams({
-        ownerId: userId,
-      });
+      console.log("👤 User ID:", userId);
 
+      // API dokümantasyonuna göre POST metodu ile silme
       console.log(
-        "📡 DELETE API çağrısı:",
-        `DELETE /api/base/category/${categoryId}?${params.toString()}`
+        "📡 API çağrısı:",
+        `POST /api/base/delete-category/${categoryId}`
       );
 
-      try {
-        const deleteResponse = await api.delete(
-          `/api/base/category/${categoryId}?${params.toString()}`
-        );
-        console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
-        return deleteResponse.data;
-      } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
-
-        // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
-        if (
-          deleteError instanceof Error &&
-          (deleteError.code === "NETWORK_ERROR" ||
-            (deleteError instanceof Response && deleteError.status === 404) ||
-            (deleteError instanceof Response && deleteError.status === 405))
-        ) {
-          console.log(
-            "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
-          );
-
-          // POST ile silme işlemi
-          const deletePayload = {
-            id: categoryId,
-            ownerId: userId,
-            isDeleted: true, // Silindi olarak işaretle
-          };
-
-          console.log(
-            "📡 POST API çağrısı:",
-            "POST /api/base/category (DELETE)"
-          );
-          console.log("📦 Payload:", deletePayload);
-
-          const postResponse = await api.post(
-            "/api/base/category",
-            deletePayload
-          );
-          console.log("✅ POST metodu başarılı:", postResponse.data);
-          return postResponse.data;
-        }
-
-        throw deleteError; // Başka bir hata varsa yeniden fırlat
-      }
+      const response = await api.post(
+        `/api/base/delete-category/${categoryId}`
+      );
+      console.log("✅ Kategori silme başarılı:", response.data);
+      return response.data;
     } catch (error: any) {
       console.error(
         "❌ Kategori silme hatası:",
@@ -764,49 +598,24 @@ export const categoryService = {
         error.response?.data
       );
 
-      // Network Error detayları
-      if (error instanceof Error && error.code === "NETWORK_ERROR") {
-        console.error("🌐 NETWORK ERROR detayları:");
-        console.error("- Base URL:", BASE_URL);
-        console.error(
-          "- Tam URL:",
-          `${BASE_URL}/api/base/category/${categoryId}`
-        );
-        console.error("- Token mevcut:", !!token);
-        console.error("- Tarayıcı network sekmesini kontrol edin");
-
-        throw new Error(
-          "Ağ bağlantısı hatası! API sunucusuna erişilemiyor. Lütfen internet bağlantınızı kontrol edin veya sunucu yöneticisi ile iletişime geçin."
-        );
-      }
-
       // HTTP hata kodları
-      if (error instanceof Response && error.status === 403) {
+      if (error.response?.status === 403) {
         throw new Error(
           "Bu kategoriyi silme yetkiniz yok. Sadece kendi oluşturduğunuz kategorileri silebilirsiniz."
         );
       }
 
-      if (error instanceof Response && error.status === 404) {
+      if (error.response?.status === 404) {
         throw new Error(
           "Kategori bulunamadı. Bu kategori daha önce silinmiş olabilir."
         );
       }
 
-      if (error instanceof Response && error.status === 405) {
-        throw new Error(
-          "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
-        );
-      }
-
       // Genel hata
       throw new Error(
-        error instanceof Response
-          ? error.data?.message ||
-            "Kategori silinirken beklenmeyen bir hata oluştu"
-          : error instanceof Error
-          ? error.message || "Kategori silinirken beklenmeyen bir hata oluştu"
-          : "Kategori silinirken beklenmeyen bir hata oluştu"
+        error.response?.data?.message ||
+          error.message ||
+          "Kategori silinirken beklenmeyen bir hata oluştu"
       );
     }
   },
@@ -953,60 +762,17 @@ export const productService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // İlk olarak DELETE metodu deneyelim
-      console.log("🔥 Method 1: DELETE metodu deneniyor...");
-      const params = new URLSearchParams({
-        ownerId: userId,
-      });
+      console.log("👤 User ID:", userId);
 
+      // API dokümantasyonuna göre POST metodu ile silme
       console.log(
-        "📡 DELETE API çağrısı:",
-        `DELETE /api/base/product/${productId}?${params.toString()}`
+        "📡 API çağrısı:",
+        `POST /api/base/delete-product/${productId}`
       );
 
-      try {
-        const deleteResponse = await api.delete(
-          `/api/base/product/${productId}?${params.toString()}`
-        );
-        console.log("✅ DELETE metodu başarılı:", deleteResponse.data);
-        return deleteResponse.data;
-      } catch (deleteError: any) {
-        console.warn("⚠️ DELETE metodu başarısız:", deleteError);
-
-        // Eğer 404 veya Network Error alırsak, POST metodunu deneyelim
-        if (
-          deleteError instanceof Error &&
-          (deleteError.code === "NETWORK_ERROR" ||
-            (deleteError instanceof Response && deleteError.status === 404) ||
-            (deleteError instanceof Response && deleteError.status === 405))
-        ) {
-          console.log(
-            "🔄 Method 2: POST metodu deneniyor (DELETE operasyon)..."
-          );
-
-          // POST ile silme işlemi
-          const deletePayload = {
-            id: productId,
-            ownerId: userId,
-            isDeleted: true, // Silindi olarak işaretle
-          };
-
-          console.log(
-            "📡 POST API çağrısı:",
-            "POST /api/base/product (DELETE)"
-          );
-          console.log("📦 Payload:", deletePayload);
-
-          const postResponse = await api.post(
-            "/api/base/product",
-            deletePayload
-          );
-          console.log("✅ POST metodu başarılı:", postResponse.data);
-          return postResponse.data;
-        }
-
-        throw deleteError; // Başka bir hata varsa yeniden fırlat
-      }
+      const response = await api.post(`/api/base/delete-product/${productId}`);
+      console.log("✅ Ürün silme başarılı:", response.data);
+      return response.data;
     } catch (error: any) {
       console.error(
         "❌ Ürün silme hatası:",
@@ -1014,48 +780,24 @@ export const productService = {
         error.response?.data
       );
 
-      // Network Error detayları
-      if (error instanceof Error && error.code === "NETWORK_ERROR") {
-        console.error("🌐 NETWORK ERROR detayları:");
-        console.error("- Base URL:", BASE_URL);
-        console.error(
-          "- Tam URL:",
-          `${BASE_URL}/api/base/product/${productId}`
-        );
-        console.error("- Token mevcut:", !!token);
-        console.error("- Tarayıcı network sekmesini kontrol edin");
-
-        throw new Error(
-          "Ağ bağlantısı hatası! API sunucusuna erişilemiyor. Lütfen internet bağlantınızı kontrol edin veya sunucu yöneticisi ile iletişime geçin."
-        );
-      }
-
       // HTTP hata kodları
-      if (error instanceof Response && error.status === 403) {
+      if (error.response?.status === 403) {
         throw new Error(
           "Bu ürünü silme yetkiniz yok. Sadece kendi oluşturduğunuz ürünleri silebilirsiniz."
         );
       }
 
-      if (error instanceof Response && error.status === 404) {
+      if (error.response?.status === 404) {
         throw new Error(
           "Ürün bulunamadı. Bu ürün daha önce silinmiş olabilir."
         );
       }
 
-      if (error instanceof Response && error.status === 405) {
-        throw new Error(
-          "Bu API DELETE metodunu desteklemiyor. Sunucu yapılandırmasını kontrol edin."
-        );
-      }
-
       // Genel hata
       throw new Error(
-        error instanceof Response
-          ? error.data?.message || "Ürün silinirken beklenmeyen bir hata oluştu"
-          : error instanceof Error
-          ? error.message || "Ürün silinirken beklenmeyen bir hata oluştu"
-          : "Ürün silinirken beklenmeyen bir hata oluştu"
+        error.response?.data?.message ||
+          error.message ||
+          "Ürün silinirken beklenmeyen bir hata oluştu"
       );
     }
   },
