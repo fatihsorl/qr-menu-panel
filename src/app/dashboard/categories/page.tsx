@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Edit, Trash2, Plus, X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import ImageUpload from '@/components/ImageUpload';
 import { useAuthStore } from '@/lib/store';
 import { categoryService, menuService, productService } from '@/lib/api';
 import { Category, UpdateCategoryData, CreateProductData } from '@/lib/types';
+import { optimizeCloudinaryUrl } from '@/lib/cloudinary';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -15,6 +17,11 @@ interface CategoryWithMenu extends Category {
 }
 
 function CategoriesContent() {
+    const { user } = useAuthStore();
+    const searchParams = useSearchParams();
+    const menuId = searchParams.get('menuId'); // URL'den menuId'yi al
+    const urlLanguage = searchParams.get('language'); // URL'den language'ı al
+
     const [categories, setCategories] = useState<CategoryWithMenu[]>([]);
     const [loading, setLoading] = useState(true);
     const [menuTitle, setMenuTitle] = useState<string>('');
@@ -24,6 +31,18 @@ function CategoriesContent() {
         description: '',
         imageUrl: ''
     });
+
+    // Language filter state - URL'den başlangıç değeri al
+    const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
+        const initialLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : 'tr';
+        console.log(`🚀 Kategoriler sayfası başlatılıyor - URL Language: ${urlLanguage}, Seçilen: ${initialLanguage}`);
+        return initialLanguage;
+    });
+
+    // Loading states
+    const [editLoading, setEditLoading] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState<string | null>(null); // categoryId being deleted
+    const [productLoading, setProductLoading] = useState(false);
 
     // Accordion state - hangi menüler açık
     const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
@@ -37,25 +56,58 @@ function CategoriesContent() {
         price: 0
     });
     const [productPriceInput, setProductPriceInput] = useState('');
-    const [productLoading, setProductLoading] = useState(false);
 
-    const { user } = useAuthStore();
-    const searchParams = useSearchParams();
-    const menuId = searchParams.get('menuId'); // URL'den menuId'yi al
+    // Auth check
+    useEffect(() => {
+        if (!user) {
+            toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+            return;
+        }
+    }, [user]);
+
+    // URL'den language değiştiğinde state'i güncelle
+    useEffect(() => {
+        const urlLanguage = searchParams.get('language');
+        if (urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) && urlLanguage !== selectedLanguage) {
+            console.log(`🔄 URL'den language değişti: ${selectedLanguage} → ${urlLanguage}`);
+            setSelectedLanguage(urlLanguage);
+        }
+    }, [searchParams, selectedLanguage]);
 
     const loadCategoriesForMenu = useCallback(async () => {
+        if (!user) {
+            toast.error('Giriş yapmanız gerekiyor');
+            return;
+        }
+
+        // URL'den direkt language al
+        const urlLanguage = searchParams.get('language');
+        const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
+
+        console.log(`🔍 loadCategoriesForMenu başlatıldı:`);
+        console.log(`📋 URL Language: ${urlLanguage}`);
+        console.log(`🌐 Current Language: ${currentLanguage}`);
+        console.log(`📝 Menu ID: ${menuId}`);
+
         try {
             setLoading(true);
             if (user && menuId) {
                 // Önce menü bilgisini al
-                const menusResponse = await menuService.getMyMenus();
+                const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed) {
                     const selectedMenu = menusResponse.data.find(menu => menu.id === menuId);
                     if (selectedMenu) {
                         setMenuTitle(selectedMenu.title);
 
-                        // Sadece seçilen menünün kategorilerini al
-                        const categoriesResponse = await categoryService.getCategoriesByMenuId(menuId);
+                        // Sadece seçilen menünün kategorilerini al - URL'den gelen language ile
+                        console.log(`🔍 Kategori API çağrısı yapılacak - Language: ${currentLanguage}`);
+
+                        // URL'den language'ı taze oku
+                        const freshUrlLanguage = window.location.search.includes('language=en') ? 'en' :
+                            window.location.search.includes('language=ru') ? 'ru' : 'tr';
+                        console.log(`🚀 FRESH URL Language: ${freshUrlLanguage}`);
+
+                        const categoriesResponse = await categoryService.getCategoriesByMenuId(menuId, freshUrlLanguage);
                         if (categoriesResponse.isSucceed) {
                             const categoriesWithMenu = categoriesResponse.data.map(cat => ({
                                 ...cat,
@@ -71,13 +123,33 @@ function CategoriesContent() {
                     }
                 }
             } else if (user && !menuId) {
-                // Eğer menuId yoksa tüm kategorileri göster (eski davranış)
-                const menusResponse = await menuService.getMyMenus();
+                // Eğer menuId yoksa seçilen dile göre tüm kategorileri göster
+                const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
+                    // DEBUG: API'dan dönen tüm menüleri ve language değerlerini göster
+                    console.log('🔍 Kategoriler sayfası - API\'dan dönen tüm menüler:', menusResponse.data);
+                    console.log('🌐 Kategoriler sayfası - Kullanılan dil:', currentLanguage);
+
+                    // Her menünün language değerini kontrol et
+                    menusResponse.data.forEach((menu, index) => {
+                        console.log(`📋 Kategoriler sayfası - Menü ${index + 1}: "${menu.title}" - Language: "${menu.language}"`);
+                    });
+
+                    // Frontend'de dil filtrelemesi yap
+                    const filteredMenus = menusResponse.data.filter(menu => menu.language === currentLanguage);
+
+                    console.log('✅ Kategoriler sayfası - Frontend\'de filtrelenmiş menüler:', filteredMenus);
+                    console.log(`📊 Kategoriler sayfası - Toplam ${menusResponse.data.length} menü, ${filteredMenus.length} tanesi "${currentLanguage}" dilinde`);
+
+                    if (filteredMenus.length === 0) {
+                        setCategories([]);
+                        return;
+                    }
+
                     const allCategories: CategoryWithMenu[] = [];
-                    for (const menu of menusResponse.data) {
+                    for (const menu of filteredMenus) {
                         try {
-                            const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id);
+                            const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id, currentLanguage);
                             if (categoriesResponse.isSucceed) {
                                 const categoriesWithMenu = categoriesResponse.data.map(cat => ({
                                     ...cat,
@@ -85,8 +157,16 @@ function CategoriesContent() {
                                 }));
                                 allCategories.push(...categoriesWithMenu);
                             }
-                        } catch {
+                        } catch (error) {
                             console.log(`Menü ${menu.title} için kategori bulunamadı`);
+                            // Check for auth errors
+                            if (error && typeof error === 'object' && 'response' in error) {
+                                const axiosError = error as any;
+                                if (axiosError.response?.status === 401) {
+                                    toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                                    return;
+                                }
+                            }
                         }
                     }
                     setCategories(allCategories);
@@ -94,11 +174,21 @@ function CategoriesContent() {
             }
         } catch (error: unknown) {
             console.error('Kategoriler yüklenirken hata:', error);
+
+            // Check for auth errors
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status === 401) {
+                    toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                    return;
+                }
+            }
+
             toast.error('Kategoriler yüklenirken hata oluştu');
         } finally {
             setLoading(false);
         }
-    }, [user, menuId]);
+    }, [user, menuId, selectedLanguage, searchParams]);
 
     useEffect(() => {
         if (user) {
@@ -107,6 +197,11 @@ function CategoriesContent() {
     }, [user, loadCategoriesForMenu]);
 
     const handleDeleteCategory = async (categoryId: string) => {
+        if (!user) {
+            toast.error('Giriş yapmanız gerekiyor');
+            return;
+        }
+
         if (window.confirm('Bu kategoriyi silmek istediğinizden emin misiniz?')) {
             try {
                 const response = await categoryService.deleteCategory(categoryId);
@@ -114,13 +209,29 @@ function CategoriesContent() {
                     toast.success('Kategori başarıyla silindi');
                     loadCategoriesForMenu();
                 }
-            } catch {
+            } catch (error) {
+                console.error('Kategori silme hatası:', error);
+
+                // Check for auth errors
+                if (error && typeof error === 'object' && 'response' in error) {
+                    const axiosError = error as any;
+                    if (axiosError.response?.status === 401) {
+                        toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                        return;
+                    }
+                }
+
                 toast.error('Kategori silinirken hata oluştu');
             }
         }
     };
 
     const handleEditCategory = (category: CategoryWithMenu) => {
+        if (!user) {
+            toast.error('Giriş yapmanız gerekiyor');
+            return;
+        }
+
         setEditingCategory(category.id);
         setEditForm({
             name: category.name,
@@ -152,13 +263,19 @@ function CategoriesContent() {
                 return;
             }
 
+            // URL'den mevcut dili al
+            const urlLanguage = searchParams.get('language');
+            const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
+
+            console.log(`🔍 handleSaveEdit - Language: ${currentLanguage}`);
+
             // MenuId'yi bulmak için menüleri çek ve bu kategorinin hangi menüye ait olduğunu bul
-            const menusResponse = await menuService.getMyMenus();
+            const menusResponse = await menuService.getMyMenus(currentLanguage);
             let foundMenuId = '';
 
             if (menusResponse.isSucceed) {
                 for (const menu of menusResponse.data) {
-                    const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id);
+                    const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id, currentLanguage);
                     if (categoriesResponse.isSucceed) {
                         const found = categoriesResponse.data.find(cat => cat.id === categoryId);
                         if (found) {
@@ -178,20 +295,36 @@ function CategoriesContent() {
                 id: categoryId,
                 menuId: foundMenuId,
                 name: editForm.name.trim(),
-                description: editForm.description.trim(),
-                imageUrl: editForm.imageUrl.trim()
+                description: '', // Boş gönder
+                imageUrl: '' // Boş gönder
             };
 
             const response = await categoryService.updateCategory(updateData);
             if (response.isSucceed) {
                 toast.success('Kategori başarıyla güncellendi');
                 setEditingCategory(null);
+                setEditForm({
+                    name: '',
+                    description: '',
+                    imageUrl: ''
+                });
                 loadCategoriesForMenu();
             } else {
                 toast.error(response.message || 'Kategori güncellenirken hata oluştu');
             }
         } catch (error: unknown) {
             console.error('Kategori güncelleme hatası:', error);
+
+            // Check if it's an authentication error
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status === 401) {
+                    toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                    // Don't attempt to continue, let the interceptor handle the logout
+                    return;
+                }
+            }
+
             toast.error('Kategori güncellenirken hata oluştu');
         }
     };
@@ -221,12 +354,18 @@ function CategoriesContent() {
 
     const handleCreateProduct = async (e: React.FormEvent, categoryId: string) => {
         e.preventDefault();
+
+        if (!user) {
+            toast.error('Giriş yapmanız gerekiyor');
+            return;
+        }
+
         setProductLoading(true);
 
         try {
             const price = parseFloat(productPriceInput);
 
-            if (!productFormData.name.trim() || !productFormData.description.trim() || isNaN(price) || price <= 0) {
+            if (!productFormData.name.trim() || isNaN(price) || price <= 0) {
                 toast.error('Lütfen tüm zorunlu alanları doldurun ve geçerli bir fiyat girin');
                 return;
             }
@@ -251,6 +390,16 @@ function CategoriesContent() {
             }
         } catch (error: unknown) {
             console.error('Ürün ekleme hatası:', error);
+
+            // Check for auth errors
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                if (axiosError.response?.status === 401) {
+                    toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                    return;
+                }
+            }
+
             toast.error('Ürün eklenirken hata oluştu');
         } finally {
             setProductLoading(false);
@@ -310,14 +459,40 @@ function CategoriesContent() {
                             Bu sayfada "{menuTitle}" ana menüsüne ait kategorileri görüntüleyebilirsiniz.
                         </p>
                     )}
+                    {!menuId && (
+                        <p className="text-sm text-gray-600">
+                            Seçilen dile göre tüm ana kategoriler görüntüleniyor.
+                        </p>
+                    )}
                 </div>
+
+                {/* Dil Seçici - Sadece menuId yoksa göster */}
+                {!menuId && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                            Dil Seçin:
+                        </label>
+                        <select
+                            value={selectedLanguage}
+                            onChange={(e) => setSelectedLanguage(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white min-w-[120px]"
+                        >
+                            <option value="tr">TR</option>
+                            <option value="en">EN</option>
+                            <option value="ru">RU</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* Categories List */}
             <div className="space-y-6">
                 {loading ? (
-                    <div className="flex items-center justify-center py-8 sm:py-12">
-                        <div className="w-6 h-6 sm:w-8 sm:h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="flex items-center justify-center py-8">
+                        <div className="text-center">
+                            <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                            <p className="text-gray-600 text-sm">Kategoriler yükleniyor...</p>
+                        </div>
                     </div>
                 ) : categories.length > 0 ? (
                     (() => {
@@ -344,8 +519,8 @@ function CategoriesContent() {
                                                 <span className="text-white font-bold text-lg">🍽️</span>
                                             </div>
                                             <div>
-                                                <h2 className="text-lg font-bold text-gray-800">{menuTitle}</h2>
-                                                <p className="text-sm text-gray-600">
+                                                <h2 className="text-sm font-semibold text-gray-700">Ana Kategori: <span className="text-sm font-extrabold text-gray-700">{menuTitle}</span></h2>
+                                                <p className="text-xs text-gray-600">
                                                     {menuCategories.length} kategori
                                                     {expandedMenus.has(menuTitle) ? ' gösteriliyor' : ' • Görmek için tıklayın'}
                                                 </p>
@@ -385,30 +560,6 @@ function CategoriesContent() {
                                                                     placeholder="Kategori adını girin"
                                                                 />
                                                             </div>
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                                    Açıklama
-                                                                </label>
-                                                                <textarea
-                                                                    value={editForm.description}
-                                                                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900"
-                                                                    rows={3}
-                                                                    placeholder="Kategori açıklaması"
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                                    Görsel URL
-                                                                </label>
-                                                                <input
-                                                                    type="url"
-                                                                    value={editForm.imageUrl}
-                                                                    onChange={(e) => setEditForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm text-gray-900"
-                                                                    placeholder="https://example.com/image.jpg"
-                                                                />
-                                                            </div>
                                                             <div className="flex items-center space-x-2 pt-2">
                                                                 <button
                                                                     onClick={() => handleSaveEdit(category.id)}
@@ -432,7 +583,7 @@ function CategoriesContent() {
                                                             <div className="flex items-start space-x-4">
                                                                 {category.imageUrl ? (
                                                                     <img
-                                                                        src={category.imageUrl}
+                                                                        src={optimizeCloudinaryUrl(category.imageUrl, 64, 64)}
                                                                         alt={category.name}
                                                                         className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                                                                     />
@@ -443,9 +594,7 @@ function CategoriesContent() {
                                                                 )}
                                                                 <div className="flex-1 min-w-0">
                                                                     <h3 className="text-lg font-semibold text-gray-900 mb-1">{category.name}</h3>
-                                                                    <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
-                                                                        {category.description || 'Açıklama bulunmuyor'}
-                                                                    </p>
+
                                                                 </div>
                                                             </div>
 
@@ -469,15 +618,14 @@ function CategoriesContent() {
                                                                         </div>
                                                                         <div>
                                                                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                                                Açıklama *
+                                                                                Açıklama
                                                                             </label>
                                                                             <textarea
                                                                                 value={productFormData.description}
                                                                                 onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
                                                                                 rows={2}
                                                                                 className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
-                                                                                placeholder="Ürün açıklaması"
-                                                                                required
+                                                                                placeholder="Ürün açıklaması (isteğe bağlı)"
                                                                             />
                                                                         </div>
                                                                         <div>
@@ -496,15 +644,11 @@ function CategoriesContent() {
                                                                             />
                                                                         </div>
                                                                         <div>
-                                                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                                                Görsel URL
-                                                                            </label>
-                                                                            <input
-                                                                                type="url"
+                                                                            <ImageUpload
                                                                                 value={productFormData.imageUrl}
-                                                                                onChange={(e) => setProductFormData({ ...productFormData, imageUrl: e.target.value })}
-                                                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900"
-                                                                                placeholder="https://example.com/image.jpg"
+                                                                                onChange={(url) => setProductFormData({ ...productFormData, imageUrl: url })}
+                                                                                label="Ürün Görseli"
+                                                                                placeholder="Ürün için görsel seçin"
                                                                             />
                                                                         </div>
                                                                         <div className="flex gap-2">
@@ -580,13 +724,13 @@ function CategoriesContent() {
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                             {menuId && menuTitle ?
                                 `"${menuTitle}" menüsünde henüz kategori bulunmuyor` :
-                                'Henüz kategori oluşturmadınız'
+                                `${selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde henüz kategori oluşturmadınız`
                             }
                         </h3>
                         <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
                             {menuId && menuTitle ?
                                 'Bu menüye kategori eklemek için ana sayfaya gidin' :
-                                'Ana sayfaya gidip ilk kategorinizi oluşturun'
+                                `${selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde ana sayfaya gidip ilk kategorinizi oluşturun`
                             }
                         </p>
                         <Link
@@ -606,15 +750,7 @@ function CategoriesContent() {
 export default function CategoriesPage() {
     return (
         <DashboardLayout>
-            <Suspense
-                fallback={
-                    <div className="flex items-center justify-center py-8 sm:py-12">
-                        <div className="w-6 h-6 sm:w-8 sm:h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                }
-            >
-                <CategoriesContent />
-            </Suspense>
+            <CategoriesContent />
         </DashboardLayout>
     );
 } 

@@ -1,11 +1,13 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, Home, Menu, Folder, Package, X, MenuIcon } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import toast from 'react-hot-toast';
+import Cookies from 'js-cookie';
+import { authService } from '@/lib/api';
 
 interface DashboardLayoutProps {
     children: ReactNode;
@@ -13,8 +15,10 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const pathname = usePathname();
-    const { user, logout } = useAuthStore();
+    const router = useRouter();
+    const { user, setUser, logout, setLoading } = useAuthStore();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [authChecked, setAuthChecked] = useState(false);
 
     const navigation = [
         { name: 'Ana Sayfa', href: '/dashboard', icon: Home },
@@ -22,6 +26,58 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         { name: 'Alt Kategoriler', href: '/dashboard/categories', icon: Folder },
         { name: 'Ürünler', href: '/dashboard/products', icon: Package },
     ];
+
+    // Auth durumunu kontrol et
+    useEffect(() => {
+        const checkAuth = async () => {
+            const token = Cookies.get('accessToken');
+
+            if (!token && !user) {
+                logout();
+                router.push('/login');
+                return;
+            }
+
+            if (user && token) {
+                try {
+                    // Token geçerliliğini kontrol et
+                    const response = await authService.getMe();
+                    if (!response.isSucceed) {
+                        logout();
+                        router.push('/login');
+                        return;
+                    }
+                } catch (error) {
+                    console.log('Auth check failed, redirecting to login');
+                    logout();
+                    router.push('/login');
+                    return;
+                }
+            }
+
+            setAuthChecked(true);
+        };
+
+        checkAuth();
+    }, [user, router, logout]);
+
+    // Auth checked olmamışsa loading göster
+    if (!authChecked) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-600 text-sm">Yükleniyor...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // User yoksa login'e yönlendir
+    if (!user) {
+        router.push('/login');
+        return null;
+    }
 
     const handleLogout = () => {
         logout();

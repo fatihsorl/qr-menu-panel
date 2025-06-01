@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Edit, Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import ImageUpload from '@/components/ImageUpload';
 import { useAuthStore } from '@/lib/store';
 import { productService, categoryService, menuService } from '@/lib/api';
 import { Product } from '@/lib/types';
+import { optimizeCloudinaryUrl } from '@/lib/cloudinary';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -16,6 +19,9 @@ interface ProductWithInfo extends Product {
 }
 
 export default function ProductsPage() {
+    const searchParams = useSearchParams();
+    const urlLanguage = searchParams.get('language'); // URL'den language'ı al
+
     const [products, setProducts] = useState<ProductWithInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingProduct, setEditingProduct] = useState<ProductWithInfo | null>(null);
@@ -26,6 +32,13 @@ export default function ProductsPage() {
         imageUrl: ''
     });
 
+    // Language filter state - URL'den başlangıç değeri al
+    const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
+        const initialLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : 'tr';
+        console.log(`🚀 Ürünler sayfası başlatılıyor - URL Language: ${urlLanguage}, Seçilen: ${initialLanguage}`);
+        return initialLanguage;
+    });
+
     // Fiyat input'u için ayrı state
     const [priceInputValue, setPriceInputValue] = useState('');
 
@@ -34,24 +47,48 @@ export default function ProductsPage() {
 
     const { user } = useAuthStore();
 
+    // URL'den language değiştiğinde state'i güncelle
+    useEffect(() => {
+        const urlLanguage = searchParams.get('language');
+        if (urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) && urlLanguage !== selectedLanguage) {
+            console.log(`🔄 URL'den language değişti: ${selectedLanguage} → ${urlLanguage}`);
+            setSelectedLanguage(urlLanguage);
+        }
+    }, [searchParams, selectedLanguage]);
+
     const loadAllData = useCallback(async () => {
         try {
             setLoading(true);
             if (user) {
+                // URL'den mevcut dili al
+                const urlLanguage = searchParams.get('language');
+                const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
+
+                console.log(`🔍 loadAllData başlatıldı - Language: ${currentLanguage}`);
+
                 // Önce menüleri al
-                const menusResponse = await menuService.getMyMenus();
+                const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
+                    console.log('🔍 Ürünler sayfası - API\'dan dönen tüm menüler:', menusResponse.data);
+                    console.log('🌐 Ürünler sayfası - Kullanılan dil:', currentLanguage);
+
+                    // Frontend'de dil filtrelemesi yap
+                    const filteredMenus = menusResponse.data.filter(menu => menu.language === currentLanguage);
+
+                    console.log('✅ Ürünler sayfası - Frontend\'de filtrelenmiş menüler:', filteredMenus);
+                    console.log(`📊 Ürünler sayfası - Toplam ${menusResponse.data.length} menü, ${filteredMenus.length} tanesi "${currentLanguage}" dilinde`);
+
                     // Her menü için kategorileri al
                     const allProducts: ProductWithInfo[] = [];
 
-                    for (const menu of menusResponse.data) {
+                    for (const menu of filteredMenus) {
                         try {
-                            const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id);
+                            const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id, currentLanguage);
                             if (categoriesResponse.isSucceed) {
                                 // Her kategori için ürünleri al
                                 for (const category of categoriesResponse.data) {
                                     try {
-                                        const productsResponse = await productService.getProductsByCategoryId(category.id);
+                                        const productsResponse = await productService.getProductsByCategoryId(category.id, currentLanguage);
                                         if (productsResponse.isSucceed) {
                                             // Her ürüne kategori ve menü bilgisini ekle
                                             const productsWithInfo = productsResponse.data.map(product => ({
@@ -80,7 +117,7 @@ export default function ProductsPage() {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, selectedLanguage, searchParams]);
 
     useEffect(() => {
         if (user) {
@@ -199,25 +236,46 @@ export default function ProductsPage() {
         <DashboardLayout>
             <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 mb-10">
                 {/* Header */}
-                <div className="flex flex-col gap-2">
-                    <Link
-                        href="/dashboard"
-                        className="flex items-center text-blue-600 hover:text-blue-700 text-sm w-fit"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Ana Sayfaya Dön
-                    </Link>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tüm Ürünler</h1>
-                    <p className="text-sm text-gray-600">
-                        Tüm ürünleri kategori bazında görüntüleyebilirsiniz.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex flex-col gap-2">
+                        <Link
+                            href="/dashboard"
+                            className="flex items-center text-blue-600 hover:text-blue-700 text-sm w-fit"
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Ana Sayfaya Dön
+                        </Link>
+                        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Tüm Ürünler</h1>
+                        <p className="text-sm text-gray-600">
+                            Seçilen dile göre tüm ürünleri kategori bazında görüntüleyebilirsiniz.
+                        </p>
+                    </div>
+
+                    {/* Dil Seçici */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                            Dil Seçin:
+                        </label>
+                        <select
+                            value={selectedLanguage}
+                            onChange={(e) => setSelectedLanguage(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white min-w-[120px]"
+                        >
+                            <option value="tr">TR</option>
+                            <option value="en">EN</option>
+                            <option value="ru">RU</option>
+                        </select>
+                    </div>
                 </div>
 
                 {/* Products List */}
                 <div className="space-y-6">
                     {loading ? (
-                        <div className="flex items-center justify-center py-8 sm:py-12">
-                            <div className="w-6 h-6 sm:w-8 sm:h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="flex items-center justify-center py-8">
+                            <div className="text-center">
+                                <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                <p className="text-gray-600 text-sm">Ürünler yükleniyor...</p>
+                            </div>
                         </div>
                     ) : products.length > 0 ? (
                         (() => {
@@ -251,12 +309,7 @@ export default function ProductsPage() {
                                                     <span className="text-white font-bold text-lg">🍽️</span>
                                                 </div>
                                                 <div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <span className="text-sm font-semibold text-gray-700">
-                                                            Ana Kategori:
-                                                        </span>
-                                                        <span className="text-sm font-semibold text-gray-700">{menuTitle}</span>
-                                                    </div>
+
                                                     <div className="flex items-center space-x-2">
                                                         <span className="text-sm font-semibold text-gray-700">
                                                             Alt Kategori:
@@ -335,11 +388,11 @@ export default function ProductsPage() {
                                                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                                                         Görsel URL
                                                                     </label>
-                                                                    <input
-                                                                        type="url"
+                                                                    <ImageUpload
                                                                         value={editForm.imageUrl}
-                                                                        onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })}
-                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-gray-900"
+                                                                        onChange={(url) => setEditForm({ ...editForm, imageUrl: url })}
+                                                                        label="Ürün Görseli"
+                                                                        placeholder="Ürün için görsel seçin"
                                                                     />
                                                                 </div>
                                                                 <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-100">
@@ -363,7 +416,7 @@ export default function ProductsPage() {
                                                                 <div className="flex items-start space-x-4">
                                                                     {product.imageUrl ? (
                                                                         <img
-                                                                            src={product.imageUrl}
+                                                                            src={optimizeCloudinaryUrl(product.imageUrl, 64, 64)}
                                                                             alt={product.name}
                                                                             className="w-16 h-16 object-cover rounded-lg border border-gray-200 flex-shrink-0"
                                                                         />
@@ -422,10 +475,10 @@ export default function ProductsPage() {
                                 </svg>
                             </div>
                             <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Henüz ürün oluşturmadınız
+                                {`${selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde henüz ürün bulunmuyor`}
                             </h3>
                             <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
-                                Ana sayfaya gidip ilk ürününüzü oluşturun
+                                {`${selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde ana sayfaya gidip ilk ürününüzü oluşturun`}
                             </p>
                             <Link
                                 href="/dashboard"

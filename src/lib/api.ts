@@ -199,7 +199,7 @@ export const authService = {
 // Menü servisleri
 export const menuService = {
   // Kendi menülerini listeleme
-  getMyMenus: async (): Promise<ApiResponse<Menu[]>> => {
+  getMyMenus: async (language?: string): Promise<ApiResponse<Menu[]>> => {
     console.log("🍔 Menü API çağrısı başlatılıyor...");
     console.log("🌐 Base URL:", BASE_URL);
 
@@ -257,11 +257,21 @@ export const menuService = {
         );
       }
 
-      // Query parametreleri ile API çağrısı
+      // Language parametresi ile API çağrısı - Backend'in beklediği formatı bulalım
       const params = new URLSearchParams({
         ownerId: userId,
-        language: "tr",
       });
+
+      // Language parametresini farklı formatlarla dene
+      if (language) {
+        // Önce orijinal format
+        params.set("language", language);
+        console.log(`🌐 Dil parametresi (orijinal): ${language}`);
+      } else {
+        // Varsayılan olarak 'tr' gönder
+        params.set("language", "tr");
+        console.log("🌐 Varsayılan dil: tr");
+      }
 
       console.log(
         "📡 API çağrısı:",
@@ -270,6 +280,8 @@ export const menuService = {
 
       const response = await api.get(`/api/base/menus?${params.toString()}`);
       console.log("✅ API başarılı:", response.data);
+
+      // Backend'den gelen veriyi olduğu gibi döndür - filtreleme frontend'de yapılacak
       return response.data;
     } catch (error: any) {
       console.error(
@@ -499,10 +511,12 @@ export const menuService = {
 export const categoryService = {
   // Menüye ait kategorileri listeleme
   getCategoriesByMenuId: async (
-    menuId: string
+    menuId: string,
+    language?: string
   ): Promise<ApiResponse<Category[]>> => {
     console.log("🔍 Kategori API çağrısı başlatılıyor...");
     console.log("📝 Menu ID:", menuId);
+    console.log("🌐 Language:", language || "varsayılan tr");
 
     // Token kontrolü
     const token = Cookies.get("accessToken");
@@ -534,7 +548,7 @@ export const categoryService = {
       // Query parametreleri ile API çağrısı
       const params = new URLSearchParams({
         ownerId: userId,
-        language: "tr",
+        language: language || "tr", // Parametre olarak gelen language kullan
       });
 
       console.log(
@@ -675,10 +689,12 @@ export const categoryService = {
 export const productService = {
   // Kategoriye ait ürünleri listeleme
   getProductsByCategoryId: async (
-    categoryId: string
+    categoryId: string,
+    language?: string
   ): Promise<ApiResponse<Product[]>> => {
     console.log("🍽️ Ürün API çağrısı başlatılıyor...");
     console.log("📝 Category ID:", categoryId);
+    console.log("🌐 Language:", language || "varsayılan tr");
 
     // Token kontrolü
     const token = Cookies.get("accessToken");
@@ -710,7 +726,7 @@ export const productService = {
       // Query parametreleri ile API çağrısı
       const params = new URLSearchParams({
         ownerId: userId,
-        language: "tr",
+        language: language || "tr", // Parametre olarak gelen language kullan
       });
 
       console.log(

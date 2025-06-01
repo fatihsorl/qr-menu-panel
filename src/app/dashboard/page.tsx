@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronRight, Check, AlertTriangle } from 'lucide-react';
 import DashboardLayout from '@/components/DashboardLayout';
+import ImageUpload from '@/components/ImageUpload';
 import { useAuthStore } from '@/lib/store';
 import { menuService, categoryService, productService, authService } from '@/lib/api';
 import { Menu, Category, CreateMenuData, CreateCategoryData, CreateProductData } from '@/lib/types';
@@ -150,8 +151,8 @@ export default function DashboardPage() {
         // Fiyat değerini parse et
         const priceValue = parseFloat(productPriceInput) || 0;
 
-        if (!productForm.name.trim() || !productForm.description.trim() || !selectedCategory || priceValue <= 0) {
-            toast.error('Tüm alanlar zorunludur ve fiyat 0\'dan büyük olmalı');
+        if (!productForm.name.trim() || !selectedCategory || priceValue <= 0) {
+            toast.error('Ürün adı, kategori seçimi zorunludur ve fiyat 0\'dan büyük olmalı');
             return;
         }
 
@@ -273,19 +274,12 @@ export default function DashboardPage() {
                                 />
                             </div>
 
-                            <div>
-                                <label htmlFor="menu-image" className="block text-sm font-medium text-gray-700 mb-1">
-                                    Görsel URL
-                                </label>
-                                <input
-                                    id="menu-image"
-                                    type="url"
-                                    value={menuForm.imageUrl}
-                                    onChange={(e) => setMenuForm({ ...menuForm, imageUrl: e.target.value })}
-                                    placeholder="https://example.com/image.jpg"
-                                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
-                                />
-                            </div>
+                            <ImageUpload
+                                value={menuForm.imageUrl}
+                                onChange={(url) => setMenuForm({ ...menuForm, imageUrl: url })}
+                                label="Ana Kategori Görseli"
+                                placeholder="Ana kategori için görsel seçin"
+                            />
 
                             <div>
                                 <label htmlFor="menu-language" className="block text-sm font-medium text-gray-700 mb-1">
@@ -375,18 +369,12 @@ export default function DashboardPage() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Görsel URL
-                                    </label>
-                                    <input
-                                        type="url"
-                                        value={categoryForm.imageUrl}
-                                        onChange={(e) => setCategoryForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900"
-                                        placeholder="https://example.com/image.jpg"
-                                    />
-                                </div>
+                                <ImageUpload
+                                    value={categoryForm.imageUrl}
+                                    onChange={(url) => setCategoryForm(prev => ({ ...prev, imageUrl: url }))}
+                                    label="Kategori Görseli"
+                                    placeholder="Kategori için görsel seçin"
+                                />
 
                                 <button
                                     type="submit"
@@ -492,15 +480,14 @@ export default function DashboardPage() {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Açıklama *
+                                            Açıklama
                                         </label>
                                         <textarea
-                                            required
                                             value={productForm.description}
                                             onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
                                             rows={2}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900"
-                                            placeholder="Ürün açıklaması"
+                                            placeholder="Ürün açıklaması (isteğe bağlı)"
                                         />
                                     </div>
 
@@ -520,18 +507,12 @@ export default function DashboardPage() {
                                         />
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Görsel URL
-                                        </label>
-                                        <input
-                                            type="url"
-                                            value={productForm.imageUrl}
-                                            onChange={(e) => setProductForm(prev => ({ ...prev, imageUrl: e.target.value }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base text-gray-900"
-                                            placeholder="https://example.com/image.jpg"
-                                        />
-                                    </div>
+                                    <ImageUpload
+                                        value={productForm.imageUrl}
+                                        onChange={(url) => setProductForm(prev => ({ ...prev, imageUrl: url }))}
+                                        label="Ürün Görseli"
+                                        placeholder="Ürün için görsel seçin"
+                                    />
 
                                     <button
                                         type="submit"

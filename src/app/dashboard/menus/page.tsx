@@ -4,15 +4,20 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Edit, Trash2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import ImageUpload from '@/components/ImageUpload';
 import { menuService, categoryService } from '@/lib/api';
 import { Menu, CreateMenuData, UpdateMenuData, CreateCategoryData } from '@/lib/types';
 import toast from 'react-hot-toast';
+import { optimizeCloudinaryUrl } from '@/lib/cloudinary';
 
 export default function MenusPage() {
     const [menus, setMenus] = useState<Menu[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
+
+    // Language filter state
+    const [selectedLanguage, setSelectedLanguage] = useState<string>('tr');
 
     // Ana kategori formu
     const [formData, setFormData] = useState({
@@ -33,9 +38,24 @@ export default function MenusPage() {
     const loadMenus = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await menuService.getMyMenus();
+            const response = await menuService.getMyMenus(selectedLanguage);
             if (response.isSucceed) {
-                setMenus(response.data);
+                // DEBUG: API'dan dönen tüm menüleri ve language değerlerini göster
+                console.log('🔍 API\'dan dönen tüm menüler:', response.data);
+                console.log('🌐 Seçilen dil:', selectedLanguage);
+
+                // Her menünün language değerini kontrol et
+                response.data.forEach((menu, index) => {
+                    console.log(`📋 Menü ${index + 1}: "${menu.title}" - Language: "${menu.language}"`);
+                });
+
+                // Frontend'de dil filtrelemesi yap
+                const filteredMenus = response.data.filter(menu => menu.language === selectedLanguage);
+
+                console.log('✅ Frontend\'de filtrelenmiş menüler:', filteredMenus);
+                console.log(`📊 Toplam ${response.data.length} menü, ${filteredMenus.length} tanesi "${selectedLanguage}" dilinde`);
+
+                setMenus(filteredMenus);
             }
         } catch (error: unknown) {
             console.error('Menüler yüklenirken hata:', error);
@@ -43,10 +63,13 @@ export default function MenusPage() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [selectedLanguage]);
 
     useEffect(() => {
         loadMenus();
+
+        // Debug için global olarak erişilebilir yap
+        (window as any).debugLoadMenus = loadMenus;
     }, [loadMenus]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -175,7 +198,30 @@ export default function MenusPage() {
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         Ana Sayfaya Dön
                     </Link>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ana Kategoriler</h1>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ana Kategoriler</h1>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Seçilen dile göre ana kategoriler görüntüleniyor.
+                            </p>
+                        </div>
+
+                        {/* Dil Seçici */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                                Dil Seçin:
+                            </label>
+                            <select
+                                value={selectedLanguage}
+                                onChange={(e) => setSelectedLanguage(e.target.value)}
+                                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white min-w-[120px]"
+                            >
+                                <option value="tr">TR</option>
+                                <option value="en">EN</option>
+                                <option value="ru">RU</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 {showForm && (
@@ -212,11 +258,11 @@ export default function MenusPage() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Görsel URL
                                 </label>
-                                <input
-                                    type="url"
+                                <ImageUpload
                                     value={formData.imageUrl}
-                                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
+                                    onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                                    label="Ana Kategori Görseli"
+                                    placeholder="Ana kategori için görsel seçin"
                                 />
                             </div>
                             <div>
@@ -230,9 +276,9 @@ export default function MenusPage() {
                                     required
                                 >
                                     <option value="" disabled>Dil seçiniz...</option>
-                                    <option value="tr">🇹🇷 Türkçe</option>
-                                    <option value="en">🇺🇸 English</option>
-                                    <option value="ru">🇷🇺 Русский</option>
+                                    <option value="tr">TR</option>
+                                    <option value="en">EN</option>
+                                    <option value="ru">RU</option>
                                 </select>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -263,18 +309,18 @@ export default function MenusPage() {
                         <div key={menu.id} className="bg-white rounded-lg shadow p-4 sm:p-6">
                             {menu.imageUrl && (
                                 <img
-                                    src={menu.imageUrl}
+                                    src={optimizeCloudinaryUrl(menu.imageUrl, 400, 300)}
                                     alt={menu.title}
                                     className="w-full h-32 sm:h-40 object-cover rounded-lg mb-4"
                                 />
                             )}
-                            <h3 className="text-base sm:text-lg font-semibold mb-2 truncate">{menu.title}</h3>
+                            <h3 className="text-base sm:text-lg font-semibold mb-2 truncate text-black">{menu.title}</h3>
                             <p className="text-gray-600 mb-2 text-sm line-clamp-2">{menu.description}</p>
                             <div className="mb-4">
                                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                    {menu.language === 'tr' && '🇹🇷 Türkçe'}
-                                    {menu.language === 'en' && '🇺🇸 English'}
-                                    {menu.language === 'ru' && '🇷🇺 Русский'}
+                                    {menu.language === 'tr'}
+                                    {menu.language === 'en'}
+                                    {menu.language === 'ru'}
                                 </span>
                             </div>
 
@@ -294,18 +340,6 @@ export default function MenusPage() {
                                                 className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
                                                 placeholder="örn: Sıcak İçecekler"
                                                 required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                Görsel URL
-                                            </label>
-                                            <input
-                                                type="url"
-                                                value={categoryFormData.imageUrl}
-                                                onChange={(e) => setCategoryFormData({ ...categoryFormData, imageUrl: e.target.value })}
-                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
-                                                placeholder="https://example.com/image.jpg"
                                             />
                                         </div>
                                         <div className="flex gap-2">
@@ -330,7 +364,7 @@ export default function MenusPage() {
 
                             <div className="flex flex-col gap-2">
                                 <Link
-                                    href={`/dashboard/categories?menuId=${menu.id}`}
+                                    href={`/dashboard/categories?menuId=${menu.id}&language=${selectedLanguage}`}
                                     className="w-full text-center px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
                                 >
                                     Alt Kategorileri Görüntüle
@@ -374,8 +408,12 @@ export default function MenusPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
-                        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Henüz menü yok</h3>
-                        <p className="text-sm text-gray-500 mb-4">Başlamak için ilk menünüzü oluşturun</p>
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
+                            {selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde henüz menü yok
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-4">
+                            {selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde başlamak için ilk menünüzü oluşturun
+                        </p>
                         <button
                             onClick={() => setShowForm(true)}
                             className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
