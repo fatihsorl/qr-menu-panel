@@ -13,7 +13,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isLoading: false,
       setUser: (user) => {
@@ -38,6 +38,13 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+// Auth logout event listener
+if (typeof window !== "undefined") {
+  window.addEventListener("auth:logout", () => {
+    useAuthStore.getState().logout();
+  });
+}
 
 interface AppState {
   selectedMenuId: string | null;

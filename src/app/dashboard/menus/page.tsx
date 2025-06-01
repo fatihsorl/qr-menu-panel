@@ -19,7 +19,7 @@ export default function MenusPage() {
         title: '',
         description: '',
         imageUrl: '',
-        language: 'tr'
+        language: ''
     });
 
     // Alt kategori ekleme state'leri
@@ -51,6 +51,12 @@ export default function MenusPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.language) {
+            toast.error('Menü dili seçmek zorunludur');
+            return;
+        }
+
         try {
             if (editingMenu) {
                 const updateData: UpdateMenuData = {
@@ -71,7 +77,7 @@ export default function MenusPage() {
 
             setShowForm(false);
             setEditingMenu(null);
-            setFormData({ title: '', description: '', imageUrl: '', language: 'tr' });
+            setFormData({ title: '', description: '', imageUrl: '', language: '' });
             loadMenus();
         } catch (error: unknown) {
             console.error('Menü kaydetme hatası:', error);
@@ -213,6 +219,22 @@ export default function MenusPage() {
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Menü Dili *
+                                </label>
+                                <select
+                                    value={formData.language}
+                                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
+                                    required
+                                >
+                                    <option value="" disabled>Dil seçiniz...</option>
+                                    <option value="tr">🇹🇷 Türkçe</option>
+                                    <option value="en">🇺🇸 English</option>
+                                    <option value="ru">🇷🇺 Русский</option>
+                                </select>
+                            </div>
                             <div className="flex flex-col sm:flex-row gap-2">
                                 <button
                                     type="submit"
@@ -225,7 +247,7 @@ export default function MenusPage() {
                                     onClick={() => {
                                         setShowForm(false);
                                         setEditingMenu(null);
-                                        setFormData({ title: '', description: '', imageUrl: '', language: 'tr' });
+                                        setFormData({ title: '', description: '', imageUrl: '', language: '' });
                                     }}
                                     className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base"
                                 >
@@ -247,7 +269,14 @@ export default function MenusPage() {
                                 />
                             )}
                             <h3 className="text-base sm:text-lg font-semibold mb-2 truncate">{menu.title}</h3>
-                            <p className="text-gray-600 mb-4 text-sm line-clamp-2">{menu.description}</p>
+                            <p className="text-gray-600 mb-2 text-sm line-clamp-2">{menu.description}</p>
+                            <div className="mb-4">
+                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                    {menu.language === 'tr' && '🇹🇷 Türkçe'}
+                                    {menu.language === 'en' && '🇺🇸 English'}
+                                    {menu.language === 'ru' && '🇷🇺 Русский'}
+                                </span>
+                            </div>
 
                             {/* Alt kategori ekleme formu */}
                             {showCategoryForm === menu.id && (

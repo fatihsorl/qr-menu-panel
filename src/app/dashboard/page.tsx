@@ -21,7 +21,7 @@ export default function DashboardPage() {
         title: '',
         description: '',
         imageUrl: '',
-        language: 'tr'
+        language: ''
     });
 
     const [categoryForm, setCategoryForm] = useState({
@@ -54,7 +54,7 @@ export default function DashboardPage() {
     };
 
     const resetAllForms = () => {
-        setMenuForm({ title: '', description: '', imageUrl: '', language: 'tr' });
+        setMenuForm({ title: '', description: '', imageUrl: '', language: '' });
         setCategoryForm({ name: '', description: '', imageUrl: '' });
         setProductForm({ name: '', description: '', imageUrl: '', price: 0 });
         setProductPriceInput('');
@@ -69,6 +69,11 @@ export default function DashboardPage() {
         e.preventDefault();
         if (!menuForm.title.trim()) {
             toast.error('Menü adı zorunludur');
+            return;
+        }
+
+        if (!menuForm.language) {
+            toast.error('Menü dili seçmek zorunludur');
             return;
         }
 
@@ -280,6 +285,24 @@ export default function DashboardPage() {
                                     placeholder="https://example.com/image.jpg"
                                     className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
                                 />
+                            </div>
+
+                            <div>
+                                <label htmlFor="menu-language" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Menü Dili*
+                                </label>
+                                <select
+                                    id="menu-language"
+                                    value={menuForm.language}
+                                    onChange={(e) => setMenuForm({ ...menuForm, language: e.target.value })}
+                                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base text-gray-900"
+                                    required
+                                >
+                                    <option value="" disabled>Dil seçiniz...</option>
+                                    <option value="tr">TR</option>
+                                    <option value="en">EN</option>
+                                    <option value="ru">RU</option>
+                                </select>
                             </div>
 
                             <button

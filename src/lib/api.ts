@@ -47,7 +47,6 @@ api.interceptors.request.use((config) => {
     console.log("✅ Authorization header eklendi");
   } else {
     console.log("❌ TOKEN YOK! Authorization header eklenmedi");
-    console.error("🚨 UYARI: Token bulunamadı! Login olmayı kontrol et.");
   }
 
   console.log("📤 Gönderilen Headers:", {
@@ -63,12 +62,63 @@ api.interceptors.request.use((config) => {
 // Response interceptor - 401 durumunda logout yapar
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const refreshToken = Cookies.get("refreshToken");
+
+      if (refreshToken) {
+        try {
+          console.log("🔄 Token yenilenmeye çalışılıyor...");
+
+          // Refresh token ile yeni access token al
+          const refreshResponse = await axios.post(
+            `${BASE_URL}/api/auth/refresh-token`,
+            {
+              refreshToken: refreshToken,
+            }
+          );
+
+          if (refreshResponse.data.isSucceed) {
+            const {
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken,
+            } = refreshResponse.data.data;
+
+            // Yeni token'ları kaydet
+            Cookies.set("accessToken", newAccessToken, { expires: 7 });
+            if (newRefreshToken) {
+              Cookies.set("refreshToken", newRefreshToken, { expires: 30 });
+            }
+
+            // Orijinal isteği yeni token ile tekrar dene
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            console.log("✅ Token yenilendi, istek tekrarlanıyor...");
+
+            return api(originalRequest);
+          }
+        } catch (refreshError) {
+          console.error("❌ Token yenileme başarısız:", refreshError);
+        }
+      }
+
+      // Token yenilenemedin, logout yap
+      console.log("🚪 Oturum sonlandırılıyor...");
       Cookies.remove("accessToken");
       Cookies.remove("refreshToken");
-      window.location.href = "/login";
+
+      // Store'a logout bilgisi gönder
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("auth:logout"));
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 100);
+      }
     }
+
     return Promise.reject(error);
   }
 );
@@ -237,10 +287,10 @@ export const menuService = {
       }
 
       // Hata detayları
-      if (error instanceof Response) {
-        console.error("📄 Response Headers:", error.headers);
-        console.error("📊 Response Status:", error.status);
-        console.error("💬 Response Message:", error.response?.data?.message);
+      if (error.response) {
+        console.error("📄 Response Headers:", error.response.headers);
+        console.error("📊 Response Status:", error.response.status);
+        console.error("💬 Response Message:", error.response.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
@@ -513,10 +563,10 @@ export const categoryService = {
       }
 
       // Hata detayları
-      if (error instanceof Response) {
-        console.error("📄 Response Headers:", error.headers);
-        console.error("📊 Response Status:", error.status);
-        console.error("💬 Response Message:", error.response?.data?.message);
+      if (error.response) {
+        console.error("📄 Response Headers:", error.response.headers);
+        console.error("📊 Response Status:", error.response.status);
+        console.error("💬 Response Message:", error.response.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
@@ -689,10 +739,10 @@ export const productService = {
       }
 
       // Hata detayları
-      if (error instanceof Response) {
-        console.error("📄 Response Headers:", error.headers);
-        console.error("📊 Response Status:", error.status);
-        console.error("💬 Response Message:", error.data?.message);
+      if (error.response) {
+        console.error("📄 Response Headers:", error.response.headers);
+        console.error("📊 Response Status:", error.response.status);
+        console.error("💬 Response Message:", error.response.data?.message);
       }
 
       // 400 hatası alırsak boş array döndür
