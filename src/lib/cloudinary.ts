@@ -49,7 +49,6 @@ export const uploadImageToCloudinary = async (
     formData.append("folder", "qr-menu-images");
 
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-    console.log("Upload URL:", uploadUrl);
 
     const response = await fetch(uploadUrl, {
       method: "POST",
