@@ -16,6 +16,19 @@ export const uploadImageToCloudinary = async (
   file: File
 ): Promise<CloudinaryUploadResult> => {
   try {
+    // Environment variable kontrolü
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    if (!cloudName) {
+      console.error(
+        "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME environment variable bulunamadı"
+      );
+      return {
+        success: false,
+        error:
+          "Cloudinary konfigürasyonu eksik. NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME tanımlı değil.",
+      };
+    }
+
     if (file.size > 5 * 1024 * 1024) {
       return {
         success: false,
@@ -35,16 +48,18 @@ export const uploadImageToCloudinary = async (
     formData.append("upload_preset", "qr-menu-preset");
     formData.append("folder", "qr-menu-images");
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    console.log("Upload URL:", uploadUrl);
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+    });
 
     if (!response.ok) {
-      throw new Error("Upload failed");
+      const errorText = await response.text();
+      console.error("Cloudinary upload failed:", response.status, errorText);
+      throw new Error(`Upload failed: ${response.status} - ${errorText}`);
     }
 
     const data: CloudinaryUploadResponse = await response.json();
@@ -57,7 +72,9 @@ export const uploadImageToCloudinary = async (
     console.error("Cloudinary upload error:", error);
     return {
       success: false,
-      error: "Görsel yükleme sırasında hata oluştu",
+      error: `Görsel yükleme sırasında hata oluştu: ${
+        error instanceof Error ? error.message : "Bilinmeyen hata"
+      }`,
     };
   }
 };
@@ -71,9 +88,17 @@ export const getOptimizedImageUrl = (
     format?: "auto" | "webp" | "jpg" | "png";
   } = {}
 ): string => {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  if (!cloudName) {
+    console.error(
+      "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME environment variable bulunamadı"
+    );
+    return publicId; // Fallback olarak publicId'yi döndür
+  }
+
   const { width = 400, height = 300, quality = 80, format = "auto" } = options;
 
-  return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/w_${width},h_${height},c_fill,q_${quality},f_${format}/${publicId}`;
+  return `https://res.cloudinary.com/${cloudName}/image/upload/w_${width},h_${height},c_fill,q_${quality},f_${format}/${publicId}`;
 };
 
 export const optimizeCloudinaryUrl = (
