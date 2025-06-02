@@ -9,12 +9,12 @@ import { menuService, categoryService } from '@/lib/api';
 import { Menu, CreateMenuData, UpdateMenuData, CreateCategoryData } from '@/lib/types';
 import toast from 'react-hot-toast';
 import { optimizeCloudinaryUrl } from '@/lib/cloudinary';
+import Cookies from 'js-cookie';
 
 export default function MenusPage() {
     const [menus, setMenus] = useState<Menu[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showForm, setShowForm] = useState(false);
-    const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
+    const [editingMenuId, setEditingMenuId] = useState<string | null>(null);
 
     const [selectedLanguage, setSelectedLanguage] = useState<string>('tr');
 
@@ -51,53 +51,147 @@ export default function MenusPage() {
     useEffect(() => {
         loadMenus();
         (window as any).debugLoadMenus = loadMenus;
+
+        // Auth durumu kontrolü
+        const checkAuthStatus = () => {
+            const token = Cookies.get('accessToken');
+            if (!token) {
+                console.warn('⚠️ Token bulunamadı, login sayfasına yönlendiriliyor...');
+                window.location.href = '/login';
+                return;
+            }
+
+            try {
+                // Token payload'ını decode et ve süresini kontrol et
+                const tokenParts = token.split('.');
+                if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    const currentTime = Math.floor(Date.now() / 1000);
+
+                    if (payload.exp && payload.exp < currentTime) {
+                        console.warn('⚠️ Token süresi dolmuş, login sayfasına yönlendiriliyor...');
+                        Cookies.remove('accessToken');
+                        Cookies.remove('refreshToken');
+                        window.location.href = '/login';
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Token decode hatası:', error);
+            }
+        };
+
+        // İlk kontrol
+        checkAuthStatus();
+
+        // Her 30 saniyede bir kontrol et
+        const authCheckInterval = setInterval(checkAuthStatus, 30000);
+
+        return () => {
+            clearInterval(authCheckInterval);
+        };
     }, [loadMenus]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        console.log('🚀 Form submit başladı:', { editingMenuId, formData });
 
         if (!formData.language) {
             toast.error('Menü dili seçmek zorunludur');
             return;
         }
 
+        // Token kontrolü
+        const token = Cookies.get('accessToken');
+        if (!token) {
+            toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+            return;
+        }
+
+        console.log('✅ Token var, API çağrısı yapılıyor...');
+
         try {
-            if (editingMenu) {
+            if (editingMenuId && editingMenuId !== 'new') {
+                console.log('📝 Güncelleme modu:', editingMenuId);
+                // Güncelleme işlemi
                 const updateData: UpdateMenuData = {
-                    id: editingMenu.id,
+                    id: editingMenuId,
                     ...formData
                 };
+                console.log('📤 Update payload:', updateData);
+
                 const response = await menuService.updateMenu(updateData);
+                console.log('📥 Update response:', response);
+
                 if (response.isSucceed) {
                     toast.success('Menü güncellendi');
+                } else {
+                    toast.error(response.message || 'Menü güncellenirken hata oluştu');
+                    return;
                 }
             } else {
+                console.log('🆕 Yeni oluşturma modu');
+                // Yeni oluşturma işlemi
                 const createData: CreateMenuData = formData;
+                console.log('📤 Create payload:', createData);
+
                 const response = await menuService.createMenu(createData);
+                console.log('📥 Create response:', response);
+
                 if (response.isSucceed) {
                     toast.success('Menü oluşturuldu');
+                } else {
+                    toast.error(response.message || 'Menü oluşturulurken hata oluştu');
+                    return;
                 }
             }
 
-            setShowForm(false);
-            setEditingMenu(null);
+            console.log('✅ API çağrısı başarılı, form resetleniyor...');
+            setEditingMenuId(null);
             setFormData({ title: '', description: '', imageUrl: '', language: '' });
-            loadMenus();
+            await loadMenus();
+            console.log('✅ Menüler yeniden yüklendi');
+
         } catch (error: unknown) {
-            console.error('Menü kaydetme hatası:', error);
-            toast.error('Menü kaydedilirken hata oluştu');
+            console.error('❌ Menü kaydetme hatası:', error);
+
+            // Axios error kontrolü
+            if (error && typeof error === 'object' && 'response' in error) {
+                const axiosError = error as any;
+                console.error('📊 Axios error details:', {
+                    status: axiosError.response?.status,
+                    data: axiosError.response?.data,
+                    headers: axiosError.response?.headers
+                });
+
+                if (axiosError.response?.status === 401) {
+                    toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+                } else if (axiosError.response?.data?.message) {
+                    toast.error(axiosError.response.data.message);
+                } else {
+                    toast.error('Menü kaydedilirken hata oluştu');
+                }
+            } else {
+                console.error('📊 Non-axios error:', error);
+                toast.error('Menü kaydedilirken hata oluştu');
+            }
         }
     };
 
     const handleEdit = (menu: Menu) => {
-        setEditingMenu(menu);
+        setEditingMenuId(menu.id);
         setFormData({
             title: menu.title,
             description: menu.description,
             imageUrl: menu.imageUrl,
             language: menu.language
         });
-        setShowForm(true);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMenuId(null);
+        setFormData({ title: '', description: '', imageUrl: '', language: '' });
     };
 
     const handleDelete = async (menuId: string) => {
@@ -187,6 +281,13 @@ export default function MenusPage() {
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                            <button
+                                onClick={() => setEditingMenuId('new')}
+                                className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm whitespace-nowrap"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Yeni Ana Kategori
+                            </button>
                             <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
                                 Dil Seçin:
                             </label>
@@ -203,15 +304,15 @@ export default function MenusPage() {
                     </div>
                 </div>
 
-                {showForm && (
+                {editingMenuId === 'new' && (
                     <div className="bg-white rounded-lg shadow p-4 sm:p-6">
                         <h2 className="text-lg sm:text-xl font-semibold mb-4">
-                            {editingMenu ? 'Ana Kategori Düzenle' : 'Yeni Ana Kategori Oluştur'}
+                            Yeni Ana Kategori Oluştur
                         </h2>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Ana Kategori Adı
+                                    Ana Kategori Adı *
                                 </label>
                                 <input
                                     type="text"
@@ -223,7 +324,7 @@ export default function MenusPage() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Açıklama
+                                    Açıklama *
                                 </label>
                                 <textarea
                                     value={formData.description}
@@ -265,15 +366,11 @@ export default function MenusPage() {
                                     type="submit"
                                     className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm sm:text-base"
                                 >
-                                    {editingMenu ? 'Güncelle' : 'Oluştur'}
+                                    Oluştur
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setShowForm(false);
-                                        setEditingMenu(null);
-                                        setFormData({ title: '', description: '', imageUrl: '', language: '' });
-                                    }}
+                                    onClick={handleCancelEdit}
                                     className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm sm:text-base"
                                 >
                                     İptal
@@ -297,11 +394,85 @@ export default function MenusPage() {
                             <p className="text-gray-600 mb-2 text-sm line-clamp-2">{menu.description}</p>
                             <div className="mb-4">
                                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                    {menu.language === 'tr'}
-                                    {menu.language === 'en'}
-                                    {menu.language === 'ru'}
+                                    {menu.language === 'tr' && 'TR'}
+                                    {menu.language === 'en' && 'EN'}
+                                    {menu.language === 'ru' && 'RU'}
                                 </span>
                             </div>
+
+                            {editingMenuId === menu.id && (
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <h4 className="text-sm font-medium text-blue-800 mb-3">Ana Kategori Düzenle</h4>
+                                    <form onSubmit={handleSubmit} className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Ana Kategori Adı *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.title}
+                                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Açıklama *
+                                            </label>
+                                            <textarea
+                                                value={formData.description}
+                                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                                rows={2}
+                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Görsel URL
+                                            </label>
+                                            <ImageUpload
+                                                value={formData.imageUrl}
+                                                onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                                                label="Ana Kategori Görseli"
+                                                placeholder="Ana kategori için görsel seçin"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Menü Dili *
+                                            </label>
+                                            <select
+                                                value={formData.language}
+                                                onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                                className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                                                required
+                                            >
+                                                <option value="" disabled>Dil seçiniz...</option>
+                                                <option value="tr">TR</option>
+                                                <option value="en">EN</option>
+                                                <option value="ru">RU</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="submit"
+                                                className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                            >
+                                                Güncelle
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleCancelEdit}
+                                                className="flex-1 px-3 py-1.5 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+                                            >
+                                                İptal
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
 
                             {showCategoryForm === menu.id && (
                                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -357,22 +528,24 @@ export default function MenusPage() {
                                     </button>
                                 )}
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleEdit(menu)}
-                                        className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
-                                    >
-                                        <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                        Düzenle
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(menu.id)}
-                                        className="flex-1 flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
-                                    >
-                                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                        Sil
-                                    </button>
-                                </div>
+                                {editingMenuId === menu.id ? null : (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => handleEdit(menu)}
+                                            className="flex-1 flex items-center justify-center px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
+                                        >
+                                            <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                            Düzenle
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(menu.id)}
+                                            className="flex-1 flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
+                                        >
+                                            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                            Sil
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -392,7 +565,7 @@ export default function MenusPage() {
                             {selectedLanguage === 'tr' ? 'Türkçe' : selectedLanguage === 'en' ? 'İngilizce' : 'Rusça'} dilinde başlamak için ilk menünüzü oluşturun
                         </p>
                         <button
-                            onClick={() => setShowForm(true)}
+                            onClick={() => setEditingMenuId('new')}
                             className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm"
                         >
                             <Plus className="w-4 h-4 mr-2" />
