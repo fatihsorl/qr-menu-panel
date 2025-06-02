@@ -14,10 +14,7 @@ export const useAuth = () => {
       setLoading(true);
       const response = await authService.login({ email, password });
 
-      console.log("Login response:", response); // Debug log
-
       if (response.isSucceed) {
-        console.log("User data from login:", response.data); // Debug log
         setUser(response.data);
         toast.success("Başarıyla giriş yapıldı!");
         router.push("/dashboard");
@@ -25,7 +22,7 @@ export const useAuth = () => {
         toast.error("Giriş yapılırken hata oluştu!");
       }
     } catch (error: unknown) {
-      console.error("Login error:", error); // Debug log
+      console.error("Login error:", error);
       const errorMessage =
         error && typeof error === "object" && "response" in error
           ? (error as { response?: { data?: { message?: string } } })?.response
@@ -42,10 +39,7 @@ export const useAuth = () => {
       setLoading(true);
       const response = await authService.register({ email, password });
 
-      console.log("Register response:", response); // Debug log
-
       if (response.isSucceed) {
-        console.log("User data from register:", response.data); // Debug log
         setUser(response.data);
         toast.success("Başarıyla kayıt olundu!");
         router.push("/dashboard");
@@ -53,7 +47,7 @@ export const useAuth = () => {
         toast.error("Kayıt olurken hata oluştu!");
       }
     } catch (error: unknown) {
-      console.error("Register error:", error); // Debug log
+      console.error("Register error:", error);
       const errorMessage =
         error && typeof error === "object" && "response" in error
           ? (error as { response?: { data?: { message?: string } } })?.response
@@ -71,19 +65,16 @@ export const useAuth = () => {
     router.push("/login");
   };
 
-  // Token'ı kontrol et ve kullanıcı bilgilerini getir
   const checkAuth = async () => {
     try {
       const response = await authService.getMe();
-      console.log("CheckAuth response:", response); // Debug log
       if (response.isSucceed) {
-        console.log("User data from checkAuth:", response.data); // Debug log
         setUser(response.data);
       } else {
         logout();
       }
     } catch (error) {
-      console.error("CheckAuth error:", error); // Debug log
+      console.error("CheckAuth error:", error);
       logout();
     }
   };

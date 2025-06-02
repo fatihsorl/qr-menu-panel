@@ -19,8 +19,8 @@ interface CategoryWithMenu extends Category {
 function CategoriesContent() {
     const { user } = useAuthStore();
     const searchParams = useSearchParams();
-    const menuId = searchParams.get('menuId'); // URL'den menuId'yi al
-    const urlLanguage = searchParams.get('language'); // URL'den language'ı al
+    const menuId = searchParams.get('menuId');
+    const urlLanguage = searchParams.get('language');
 
     const [categories, setCategories] = useState<CategoryWithMenu[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,23 +32,14 @@ function CategoriesContent() {
         imageUrl: ''
     });
 
-    // Language filter state - URL'den başlangıç değeri al
     const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
         const initialLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : 'tr';
-        console.log(`🚀 Kategoriler sayfası başlatılıyor - URL Language: ${urlLanguage}, Seçilen: ${initialLanguage}`);
         return initialLanguage;
     });
 
-    // Loading states
-    const [editLoading, setEditLoading] = useState(false);
-    const [deleteLoading, setDeleteLoading] = useState<string | null>(null); // categoryId being deleted
     const [productLoading, setProductLoading] = useState(false);
-
-    // Accordion state - hangi menüler açık
     const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
-
-    // Ürün ekleme state'leri
-    const [showProductForm, setShowProductForm] = useState<string | null>(null); // hangi kategori için form açık
+    const [showProductForm, setShowProductForm] = useState<string | null>(null);
     const [productFormData, setProductFormData] = useState({
         name: '',
         description: '',
@@ -57,7 +48,6 @@ function CategoriesContent() {
     });
     const [productPriceInput, setProductPriceInput] = useState('');
 
-    // Auth check
     useEffect(() => {
         if (!user) {
             toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
@@ -65,11 +55,9 @@ function CategoriesContent() {
         }
     }, [user]);
 
-    // URL'den language değiştiğinde state'i güncelle
     useEffect(() => {
         const urlLanguage = searchParams.get('language');
         if (urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) && urlLanguage !== selectedLanguage) {
-            console.log(`🔄 URL'den language değişti: ${selectedLanguage} → ${urlLanguage}`);
             setSelectedLanguage(urlLanguage);
         }
     }, [searchParams, selectedLanguage]);
@@ -80,32 +68,20 @@ function CategoriesContent() {
             return;
         }
 
-        // URL'den direkt language al
         const urlLanguage = searchParams.get('language');
         const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
-
-        console.log(`🔍 loadCategoriesForMenu başlatıldı:`);
-        console.log(`📋 URL Language: ${urlLanguage}`);
-        console.log(`🌐 Current Language: ${currentLanguage}`);
-        console.log(`📝 Menu ID: ${menuId}`);
 
         try {
             setLoading(true);
             if (user && menuId) {
-                // Önce menü bilgisini al
                 const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed) {
                     const selectedMenu = menusResponse.data.find(menu => menu.id === menuId);
                     if (selectedMenu) {
                         setMenuTitle(selectedMenu.title);
 
-                        // Sadece seçilen menünün kategorilerini al - URL'den gelen language ile
-                        console.log(`🔍 Kategori API çağrısı yapılacak - Language: ${currentLanguage}`);
-
-                        // URL'den language'ı taze oku
                         const freshUrlLanguage = window.location.search.includes('language=en') ? 'en' :
                             window.location.search.includes('language=ru') ? 'ru' : 'tr';
-                        console.log(`🚀 FRESH URL Language: ${freshUrlLanguage}`);
 
                         const categoriesResponse = await categoryService.getCategoriesByMenuId(menuId, freshUrlLanguage);
                         if (categoriesResponse.isSucceed) {
@@ -123,24 +99,9 @@ function CategoriesContent() {
                     }
                 }
             } else if (user && !menuId) {
-                // Eğer menuId yoksa seçilen dile göre tüm kategorileri göster
                 const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
-                    // DEBUG: API'dan dönen tüm menüleri ve language değerlerini göster
-                    console.log('🔍 Kategoriler sayfası - API\'dan dönen tüm menüler:', menusResponse.data);
-                    console.log('🌐 Kategoriler sayfası - Kullanılan dil:', currentLanguage);
-
-                    // Her menünün language değerini kontrol et
-                    menusResponse.data.forEach((menu, index) => {
-                        console.log(`📋 Kategoriler sayfası - Menü ${index + 1}: "${menu.title}" - Language: "${menu.language}"`);
-                    });
-
-                    // Frontend'de dil filtrelemesi yap
                     const filteredMenus = menusResponse.data.filter(menu => menu.language === currentLanguage);
-
-                    console.log('✅ Kategoriler sayfası - Frontend\'de filtrelenmiş menüler:', filteredMenus);
-                    console.log(`📊 Kategoriler sayfası - Toplam ${menusResponse.data.length} menü, ${filteredMenus.length} tanesi "${currentLanguage}" dilinde`);
-
                     if (filteredMenus.length === 0) {
                         setCategories([]);
                         return;
@@ -158,8 +119,6 @@ function CategoriesContent() {
                                 allCategories.push(...categoriesWithMenu);
                             }
                         } catch (error) {
-                            console.log(`Menü ${menu.title} için kategori bulunamadı`);
-                            // Check for auth errors
                             if (error && typeof error === 'object' && 'response' in error) {
                                 const axiosError = error as any;
                                 if (axiosError.response?.status === 401) {
@@ -174,8 +133,6 @@ function CategoriesContent() {
             }
         } catch (error: unknown) {
             console.error('Kategoriler yüklenirken hata:', error);
-
-            // Check for auth errors
             if (error && typeof error === 'object' && 'response' in error) {
                 const axiosError = error as any;
                 if (axiosError.response?.status === 401) {
@@ -210,9 +167,6 @@ function CategoriesContent() {
                     loadCategoriesForMenu();
                 }
             } catch (error) {
-                console.error('Kategori silme hatası:', error);
-
-                // Check for auth errors
                 if (error && typeof error === 'object' && 'response' in error) {
                     const axiosError = error as any;
                     if (axiosError.response?.status === 401) {
@@ -256,20 +210,15 @@ function CategoriesContent() {
         }
 
         try {
-            // Kategoriyi bulup menü ID'sini al
             const category = categories.find(cat => cat.id === categoryId);
             if (!category) {
                 toast.error('Kategori bulunamadı');
                 return;
             }
 
-            // URL'den mevcut dili al
             const urlLanguage = searchParams.get('language');
             const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
 
-            console.log(`🔍 handleSaveEdit - Language: ${currentLanguage}`);
-
-            // MenuId'yi bulmak için menüleri çek ve bu kategorinin hangi menüye ait olduğunu bul
             const menusResponse = await menuService.getMyMenus(currentLanguage);
             let foundMenuId = '';
 
@@ -295,8 +244,8 @@ function CategoriesContent() {
                 id: categoryId,
                 menuId: foundMenuId,
                 name: editForm.name.trim(),
-                description: '', // Boş gönder
-                imageUrl: '' // Boş gönder
+                description: '',
+                imageUrl: ''
             };
 
             const response = await categoryService.updateCategory(updateData);
@@ -315,12 +264,10 @@ function CategoriesContent() {
         } catch (error: unknown) {
             console.error('Kategori güncelleme hatası:', error);
 
-            // Check if it's an authentication error
             if (error && typeof error === 'object' && 'response' in error) {
                 const axiosError = error as any;
                 if (axiosError.response?.status === 401) {
                     toast.error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
-                    // Don't attempt to continue, let the interceptor handle the logout
                     return;
                 }
             }
@@ -329,7 +276,6 @@ function CategoriesContent() {
         }
     };
 
-    // Ürün ekleme fonksiyonları
     const handleShowProductForm = (categoryId: string) => {
         setShowProductForm(categoryId);
         setProductFormData({
@@ -383,7 +329,6 @@ function CategoriesContent() {
             if (response.isSucceed) {
                 toast.success('Ürün başarıyla eklendi');
                 handleCloseProductForm();
-                // Gerekirse kategorileri yeniden yükle
                 await loadCategoriesForMenu();
             } else {
                 toast.error(response.message || 'Ürün eklenirken hata oluştu');
@@ -391,7 +336,6 @@ function CategoriesContent() {
         } catch (error: unknown) {
             console.error('Ürün ekleme hatası:', error);
 
-            // Check for auth errors
             if (error && typeof error === 'object' && 'response' in error) {
                 const axiosError = error as any;
                 if (axiosError.response?.status === 401) {
@@ -418,7 +362,6 @@ function CategoriesContent() {
         });
     };
 
-    // İlk yüklendiğinde eğer tek menü varsa otomatik aç
     useEffect(() => {
         if (categories.length > 0) {
             const groupedCategories = categories.reduce((groups, category) => {
@@ -432,7 +375,6 @@ function CategoriesContent() {
 
             const menuTitles = Object.keys(groupedCategories);
 
-            // Eğer tek menü varsa veya URL'de menuId varsa otomatik aç
             if (menuTitles.length === 1 || menuId) {
                 setExpandedMenus(new Set(menuTitles));
             }

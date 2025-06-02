@@ -16,10 +16,8 @@ export default function MenusPage() {
     const [showForm, setShowForm] = useState(false);
     const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
 
-    // Language filter state
     const [selectedLanguage, setSelectedLanguage] = useState<string>('tr');
 
-    // Ana kategori formu
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -27,8 +25,7 @@ export default function MenusPage() {
         language: ''
     });
 
-    // Alt kategori ekleme state'leri
-    const [showCategoryForm, setShowCategoryForm] = useState<string | null>(null); // hangi menu için form açık
+    const [showCategoryForm, setShowCategoryForm] = useState<string | null>(null);
     const [categoryFormData, setCategoryFormData] = useState({
         name: '',
         imageUrl: ''
@@ -40,21 +37,7 @@ export default function MenusPage() {
             setLoading(true);
             const response = await menuService.getMyMenus(selectedLanguage);
             if (response.isSucceed) {
-                // DEBUG: API'dan dönen tüm menüleri ve language değerlerini göster
-                console.log('🔍 API\'dan dönen tüm menüler:', response.data);
-                console.log('🌐 Seçilen dil:', selectedLanguage);
-
-                // Her menünün language değerini kontrol et
-                response.data.forEach((menu, index) => {
-                    console.log(`📋 Menü ${index + 1}: "${menu.title}" - Language: "${menu.language}"`);
-                });
-
-                // Frontend'de dil filtrelemesi yap
                 const filteredMenus = response.data.filter(menu => menu.language === selectedLanguage);
-
-                console.log('✅ Frontend\'de filtrelenmiş menüler:', filteredMenus);
-                console.log(`📊 Toplam ${response.data.length} menü, ${filteredMenus.length} tanesi "${selectedLanguage}" dilinde`);
-
                 setMenus(filteredMenus);
             }
         } catch (error: unknown) {
@@ -67,8 +50,6 @@ export default function MenusPage() {
 
     useEffect(() => {
         loadMenus();
-
-        // Debug için global olarak erişilebilir yap
         (window as any).debugLoadMenus = loadMenus;
     }, [loadMenus]);
 
@@ -134,7 +115,6 @@ export default function MenusPage() {
         }
     };
 
-    // Alt kategori ekleme fonksiyonları
     const handleShowCategoryForm = (menuId: string) => {
         setShowCategoryForm(menuId);
         setCategoryFormData({ name: '', imageUrl: '' });
@@ -157,7 +137,7 @@ export default function MenusPage() {
             const categoryData: CreateCategoryData = {
                 menuId: menuId,
                 name: categoryFormData.name.trim(),
-                description: '', // Açıklama boş gönderiliyor
+                description: '',
                 imageUrl: categoryFormData.imageUrl.trim()
             };
 
@@ -206,7 +186,6 @@ export default function MenusPage() {
                             </p>
                         </div>
 
-                        {/* Dil Seçici */}
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
                                 Dil Seçin:
@@ -324,7 +303,6 @@ export default function MenusPage() {
                                 </span>
                             </div>
 
-                            {/* Alt kategori ekleme formu */}
                             {showCategoryForm === menu.id && (
                                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                                     <h4 className="text-sm font-medium text-green-800 mb-3">Alt Kategori Ekle</h4>
@@ -370,7 +348,6 @@ export default function MenusPage() {
                                     Alt Kategorileri Görüntüle
                                 </Link>
 
-                                {/* Alt kategori ekleme butonu */}
                                 {showCategoryForm === menu.id ? null : (
                                     <button
                                         onClick={() => handleShowCategoryForm(menu.id)}

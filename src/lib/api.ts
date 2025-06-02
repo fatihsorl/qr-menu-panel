@@ -16,12 +16,10 @@ import {
   UpdateProductData,
 } from "./types";
 
-// Base API URL - gerçek API endpoint'inizi buraya yazın
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "https://jovial-bouman.104-247-167-194.plesk.page";
 
-// Axios instance oluşturuyoruz
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -29,37 +27,16 @@ const api = axios.create({
   },
 });
 
-// Request interceptor - token'ı otomatik olarak ekler
 api.interceptors.request.use((config) => {
   const token = Cookies.get("accessToken");
 
-  console.log("🚀 ===== API REQUEST DETAYLARI =====");
-  console.log("📍 Full URL:", `${config.baseURL}${config.url}`);
-  console.log(
-    "🔑 Token:",
-    token ? `${token.substring(0, 20)}...` : "❌ TOKEN YOK!"
-  );
-  console.log("📋 Method:", config.method?.toUpperCase());
-  console.log("📦 Data:", config.data);
-
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log("✅ Authorization header eklendi");
-  } else {
-    console.log("❌ TOKEN YOK! Authorization header eklenmedi");
   }
-
-  console.log("📤 Gönderilen Headers:", {
-    Authorization: config.headers.Authorization,
-    "Content-Type": config.headers["Content-Type"],
-    Accept: config.headers.Accept,
-  });
-  console.log("=======================================");
 
   return config;
 });
 
-// Response interceptor - 401 durumunda logout yapar
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -72,9 +49,6 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          console.log("🔄 Token yenilenmeye çalışılıyor...");
-
-          // Refresh token ile yeni access token al
           const refreshResponse = await axios.post(
             `${BASE_URL}/api/auth/refresh-token`,
             {
@@ -88,15 +62,12 @@ api.interceptors.response.use(
               refreshToken: newRefreshToken,
             } = refreshResponse.data.data;
 
-            // Yeni token'ları kaydet
             Cookies.set("accessToken", newAccessToken, { expires: 7 });
             if (newRefreshToken) {
               Cookies.set("refreshToken", newRefreshToken, { expires: 30 });
             }
 
-            // Orijinal isteği yeni token ile tekrar dene
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-            console.log("✅ Token yenilendi, istek tekrarlanıyor...");
 
             return api(originalRequest);
           }
@@ -105,12 +76,9 @@ api.interceptors.response.use(
         }
       }
 
-      // Token yenilenemedin, logout yap
-      console.log("🚪 Oturum sonlandırılıyor...");
       Cookies.remove("accessToken");
       Cookies.remove("refreshToken");
 
-      // Store'a logout bilgisi gönder
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("auth:logout"));
         setTimeout(() => {
@@ -123,39 +91,19 @@ api.interceptors.response.use(
   }
 );
 
-// Auth servisleri
 export const authService = {
-  // API sunucu durumunu test et
   testApiServer: async (): Promise<void> => {
-    console.log("🔍 API sunucu testi başlatılıyor...");
-    console.log("🌐 Base URL:", BASE_URL);
-
-    // Basit GET isteği ile test
     const testEndpoints = ["/", "/api", "/health", "/api/health", "/status"];
 
     for (const endpoint of testEndpoints) {
       try {
-        console.log(`🧪 Test edilen: ${BASE_URL}${endpoint}`);
         const response = await fetch(`${BASE_URL}${endpoint}`, {
           method: "GET",
         });
-        console.log(
-          `✅ ${endpoint} yanıt verdi:`,
-          response.status,
-          response.statusText
-        );
-
-        if (response.ok) {
-          const text = await response.text();
-          console.log(`📄 İçerik:`, text.substring(0, 200));
-        }
-      } catch (error: any) {
-        console.log(`❌ ${endpoint} hata:`, error);
-      }
+      } catch (error: any) {}
     }
   },
 
-  // Kayıt olma
   register: async (
     credentials: RegisterCredentials
   ): Promise<ApiResponse<User>> => {
@@ -163,19 +111,16 @@ export const authService = {
     return response.data;
   },
 
-  // Giriş yapma
   login: async (credentials: LoginCredentials): Promise<ApiResponse<User>> => {
     const response = await api.post("/api/auth/login", credentials);
     return response.data;
   },
 
-  // Kullanıcı bilgilerini alma
   getMe: async (): Promise<ApiResponse<User>> => {
     const response = await api.get("/api/auth/me");
     return response.data;
   },
 
-  // Token yenileme
   refreshToken: async (
     userData: User
   ): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> => {
@@ -183,7 +128,6 @@ export const authService = {
     return response.data;
   },
 
-  // Şifre sıfırlama
   resetPassword: async (
     email: string,
     newPassword: string
@@ -196,37 +140,23 @@ export const authService = {
   },
 };
 
-// Menü servisleri
 export const menuService = {
-  // Kendi menülerini listeleme
   getMyMenus: async (language?: string): Promise<ApiResponse<Menu[]>> => {
-    console.log("🍔 Menü API çağrısı başlatılıyor...");
-    console.log("🌐 Base URL:", BASE_URL);
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
-    console.log("🔑 Access Token:", token ? "✅ Mevcut" : "❌ YOK!");
 
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user bilgisini çıkaralım (JWT decode)
-      console.log("🔍 Token debug başlıyor...");
-      console.log("📜 Raw Token:", token);
-
       const tokenParts = token.split(".");
-      console.log("🔧 Token parçaları sayısı:", tokenParts.length);
 
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
       }
 
       const tokenPayload = JSON.parse(atob(tokenParts[1]));
-      console.log("📋 Token Payload (tüm içerik):", tokenPayload);
 
-      // Farklı user ID field'larını kontrol edelim
       const possibleUserIdFields = [
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier", // ASP.NET Core
         "sub",
@@ -242,12 +172,9 @@ export const menuService = {
       for (const field of possibleUserIdFields) {
         if (tokenPayload[field]) {
           userId = tokenPayload[field];
-          console.log(`✅ User ID bulundu! Field: ${field}, Value: ${userId}`);
           break;
         }
       }
-
-      console.log("👤 Final User ID:", userId);
 
       if (!userId) {
         console.error("🚨 TOKEN YAPISI:", Object.keys(tokenPayload));
@@ -257,31 +184,18 @@ export const menuService = {
         );
       }
 
-      // Language parametresi ile API çağrısı - Backend'in beklediği formatı bulalım
       const params = new URLSearchParams({
         ownerId: userId,
       });
 
-      // Language parametresini farklı formatlarla dene
       if (language) {
-        // Önce orijinal format
         params.set("language", language);
-        console.log(`🌐 Dil parametresi (orijinal): ${language}`);
       } else {
-        // Varsayılan olarak 'tr' gönder
         params.set("language", "tr");
-        console.log("🌐 Varsayılan dil: tr");
       }
 
-      console.log(
-        "📡 API çağrısı:",
-        `GET /api/base/menus?${params.toString()}`
-      );
-
       const response = await api.get(`/api/base/menus?${params.toString()}`);
-      console.log("✅ API başarılı:", response.data);
 
-      // Backend'den gelen veriyi olduğu gibi döndür - filtreleme frontend'de yapılacak
       return response.data;
     } catch (error: any) {
       console.error(
@@ -290,7 +204,6 @@ export const menuService = {
         error.response?.data
       );
 
-      // Token decode hatası
       if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
@@ -298,14 +211,12 @@ export const menuService = {
         );
       }
 
-      // Hata detayları
       if (error.response) {
         console.error("📄 Response Headers:", error.response.headers);
         console.error("📊 Response Status:", error.response.status);
         console.error("💬 Response Message:", error.response.data?.message);
       }
 
-      // 400 hatası alırsak boş array döndür
       if (error.response?.status === 400) {
         console.warn("⚠️  400 hatası alındı, boş array döndürülüyor");
         return {
@@ -315,30 +226,22 @@ export const menuService = {
         };
       }
 
-      // Diğer hatalarda yeniden fırlat
       throw error;
     }
   },
 
-  // Menü detayı alma
   getMenuDetail: async (menuId: string): Promise<ApiResponse<Menu>> => {
     const response = await api.get(`/api/base/menu-detail/${menuId}`);
     return response.data;
   },
 
-  // Menü oluşturma
   createMenu: async (menuData: CreateMenuData): Promise<ApiResponse<Menu>> => {
-    console.log("➕ Menü oluşturma API çağrısı başlatılıyor...");
-    console.log("📊 Create Data:", menuData);
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -354,23 +257,14 @@ export const menuService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // API'nin beklediği formata göre payload hazırla
       const createPayload = {
-        name: menuData.title, // API'nin beklediği name field'ı - title yerine
+        name: menuData.title,
         description: menuData.description,
-        imageUrl: menuData.imageUrl || "", // Boş string yerine undefined göndermemek için
+        imageUrl: menuData.imageUrl || "",
         language: menuData.language,
       };
 
-      console.log("📡 API çağrısı: POST /api/base/menu (CREATE)");
-      console.log("📦 SWAGGER UYUMLU PAYLOAD:");
-      console.log("- name (title):", createPayload.name);
-      console.log("- description:", createPayload.description);
-      console.log("- imageUrl:", createPayload.imageUrl);
-      console.log("- language:", createPayload.language);
-
       const response = await api.post("/api/base/menu", createPayload);
-      console.log("✅ Menü oluşturma başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error("❌ MENÜ OLUŞTURMA HATA DETAYLARI:");
@@ -388,19 +282,13 @@ export const menuService = {
     }
   },
 
-  // Menü güncelleme
   updateMenu: async (menuData: UpdateMenuData): Promise<ApiResponse<Menu>> => {
-    console.log("📝 Menü güncelleme API çağrısı başlatılıyor...");
-    console.log("📊 Update Data:", menuData);
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -416,20 +304,15 @@ export const menuService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // API'nin beklediği formata göre payload hazırla
       const updatePayload = {
-        id: menuData.id, // Mevcut menünün ID'si
-        name: menuData.title, // API'nin beklediği name field'ı
+        id: menuData.id,
+        name: menuData.title,
         description: menuData.description,
         imageUrl: menuData.imageUrl || "",
         language: menuData.language,
       };
 
-      console.log("📡 API çağrısı: POST /api/base/menu (UPDATE)");
-      console.log("📦 Update Payload:", updatePayload);
-
       const response = await api.post("/api/base/menu", updatePayload);
-      console.log("✅ Menü güncelleme başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error(
@@ -441,11 +324,7 @@ export const menuService = {
     }
   },
 
-  // Menü silme
   deleteMenu: async (menuId: string): Promise<ApiResponse<boolean>> => {
-    console.log("🗑️ Menü silme API çağrısı başlatılıyor...");
-    console.log("📝 Menu ID:", menuId);
-
     // Token kontrolü
     const token = Cookies.get("accessToken");
     if (!token) {
@@ -453,7 +332,6 @@ export const menuService = {
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -469,13 +347,7 @@ export const menuService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      console.log("👤 User ID:", userId);
-
-      // API dokümantasyonuna göre POST metodu ile silme
-      console.log("📡 API çağrısı:", `POST /api/base/delete-menu/${menuId}`);
-
       const response = await api.post(`/api/base/delete-menu/${menuId}`);
-      console.log("✅ Menü silme başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error(
@@ -484,7 +356,6 @@ export const menuService = {
         error.response?.data
       );
 
-      // HTTP hata kodları
       if (error.response?.status === 403) {
         throw new Error(
           "Bu menüyü silme yetkiniz yok. Sadece kendi oluşturduğunuz menüleri silebilirsiniz."
@@ -497,7 +368,6 @@ export const menuService = {
         );
       }
 
-      // Genel hata
       throw new Error(
         error.response?.data?.message ||
           error.message ||
@@ -507,27 +377,18 @@ export const menuService = {
   },
 };
 
-// Kategori servisleri
 export const categoryService = {
-  // Menüye ait kategorileri listeleme
   getCategoriesByMenuId: async (
     menuId: string,
     language?: string
   ): Promise<ApiResponse<Category[]>> => {
-    console.log("🔍 Kategori API çağrısı başlatılıyor...");
-    console.log("📝 Menu ID:", menuId);
-    console.log("🌐 Language:", language || "varsayılan tr");
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
-    console.log("🔑 Access Token:", token ? "✅ Mevcut" : "❌ YOK!");
 
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -539,27 +400,18 @@ export const categoryService = {
           "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
         ];
 
-      console.log("👤 User ID:", userId);
-
       if (!userId) {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // Query parametreleri ile API çağrısı
       const params = new URLSearchParams({
         ownerId: userId,
-        language: language || "tr", // Parametre olarak gelen language kullan
+        language: language || "tr",
       });
-
-      console.log(
-        "📡 API çağrısı:",
-        `GET /api/base/categories/${menuId}?${params.toString()}`
-      );
 
       const response = await api.get(
         `/api/base/categories/${menuId}?${params.toString()}`
       );
-      console.log("✅ Kategori API başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error(
@@ -568,7 +420,6 @@ export const categoryService = {
         error.response?.data
       );
 
-      // Token decode hatası
       if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
@@ -576,14 +427,12 @@ export const categoryService = {
         );
       }
 
-      // Hata detayları
       if (error.response) {
         console.error("📄 Response Headers:", error.response.headers);
         console.error("📊 Response Status:", error.response.status);
         console.error("💬 Response Message:", error.response.data?.message);
       }
 
-      // 400 hatası alırsak boş array döndür
       if (error.response?.status === 400) {
         console.warn("⚠️  400 hatası alındı, boş array döndürülüyor");
         return {
@@ -593,12 +442,10 @@ export const categoryService = {
         };
       }
 
-      // Diğer hatalarda yeniden fırlat
       throw error;
     }
   },
 
-  // Kategori oluşturma
   createCategory: async (
     categoryData: CreateCategoryData
   ): Promise<ApiResponse<Category>> => {
@@ -606,7 +453,6 @@ export const categoryService = {
     return response.data;
   },
 
-  // Kategori güncelleme
   updateCategory: async (
     categoryData: UpdateCategoryData
   ): Promise<ApiResponse<Category>> => {
@@ -614,19 +460,13 @@ export const categoryService = {
     return response.data;
   },
 
-  // Kategori silme
   deleteCategory: async (categoryId: string): Promise<ApiResponse<boolean>> => {
-    console.log("🗑️ Kategori silme API çağrısı başlatılıyor...");
-    console.log("📝 Category ID:", categoryId);
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -642,18 +482,9 @@ export const categoryService = {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      console.log("👤 User ID:", userId);
-
-      // API dokümantasyonuna göre POST metodu ile silme
-      console.log(
-        "📡 API çağrısı:",
-        `POST /api/base/delete-category/${categoryId}`
-      );
-
       const response = await api.post(
         `/api/base/delete-category/${categoryId}`
       );
-      console.log("✅ Kategori silme başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error(
@@ -662,7 +493,6 @@ export const categoryService = {
         error.response?.data
       );
 
-      // HTTP hata kodları
       if (error.response?.status === 403) {
         throw new Error(
           "Bu kategoriyi silme yetkiniz yok. Sadece kendi oluşturduğunuz kategorileri silebilirsiniz."
@@ -675,7 +505,6 @@ export const categoryService = {
         );
       }
 
-      // Genel hata
       throw new Error(
         error.response?.data?.message ||
           error.message ||
@@ -685,27 +514,18 @@ export const categoryService = {
   },
 };
 
-// Ürün servisleri
 export const productService = {
-  // Kategoriye ait ürünleri listeleme
   getProductsByCategoryId: async (
     categoryId: string,
     language?: string
   ): Promise<ApiResponse<Product[]>> => {
-    console.log("🍽️ Ürün API çağrısı başlatılıyor...");
-    console.log("📝 Category ID:", categoryId);
-    console.log("🌐 Language:", language || "varsayılan tr");
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
-    console.log("🔑 Access Token:", token ? "✅ Mevcut" : "❌ YOK!");
 
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -717,27 +537,18 @@ export const productService = {
           "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
         ];
 
-      console.log("👤 User ID:", userId);
-
       if (!userId) {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
 
-      // Query parametreleri ile API çağrısı
       const params = new URLSearchParams({
         ownerId: userId,
-        language: language || "tr", // Parametre olarak gelen language kullan
+        language: language || "tr",
       });
-
-      console.log(
-        "📡 API çağrısı:",
-        `GET /api/base/products/${categoryId}?${params.toString()}`
-      );
 
       const response = await api.get(
         `/api/base/products/${categoryId}?${params.toString()}`
       );
-      console.log("✅ Ürün API başarılı:", response.data);
       return response.data;
     } catch (error: any) {
       console.error(
@@ -746,7 +557,6 @@ export const productService = {
         error.response?.data
       );
 
-      // Token decode hatası
       if (error instanceof Error && error.message?.includes("Token")) {
         console.error("🚨 TOKEN SORUNU:", error.message);
         throw new Error(
@@ -754,14 +564,12 @@ export const productService = {
         );
       }
 
-      // Hata detayları
       if (error.response) {
         console.error("📄 Response Headers:", error.response.headers);
         console.error("📊 Response Status:", error.response.status);
         console.error("💬 Response Message:", error.response.data?.message);
       }
 
-      // 400 hatası alırsak boş array döndür
       if (error instanceof Response && error.status === 400) {
         console.warn("⚠️  Ürün 400 hatası alındı, boş array döndürülüyor");
         return {
@@ -771,12 +579,10 @@ export const productService = {
         };
       }
 
-      // Diğer hatalarda yeniden fırlat
       throw error;
     }
   },
 
-  // Ürün detayı alma
   getProductDetail: async (
     productId: string
   ): Promise<ApiResponse<Product>> => {
@@ -784,7 +590,6 @@ export const productService = {
     return response.data;
   },
 
-  // Ürün oluşturma
   createProduct: async (
     productData: CreateProductData
   ): Promise<ApiResponse<Product>> => {
@@ -792,7 +597,6 @@ export const productService = {
     return response.data;
   },
 
-  // Ürün güncelleme
   updateProduct: async (
     productData: UpdateProductData
   ): Promise<ApiResponse<Product>> => {
@@ -800,19 +604,13 @@ export const productService = {
     return response.data;
   },
 
-  // Ürün silme
   deleteProduct: async (productId: string): Promise<ApiResponse<boolean>> => {
-    console.log("🗑️ Ürün silme API çağrısı başlatılıyor...");
-    console.log("📝 Product ID:", productId);
-
-    // Token kontrolü
     const token = Cookies.get("accessToken");
     if (!token) {
       throw new Error("Token bulunamadı! Lütfen tekrar giriş yapın.");
     }
 
     try {
-      // Token'dan user ID'sini çıkar
       const tokenParts = token.split(".");
       if (tokenParts.length !== 3) {
         throw new Error("Geçersiz JWT token formatı!");
@@ -827,17 +625,8 @@ export const productService = {
       if (!userId) {
         throw new Error("Token'da kullanıcı ID'si bulunamadı!");
       }
-
-      console.log("👤 User ID:", userId);
-
-      // API dokümantasyonuna göre POST metodu ile silme
-      console.log(
-        "📡 API çağrısı:",
-        `POST /api/base/delete-product/${productId}`
-      );
-
       const response = await api.post(`/api/base/delete-product/${productId}`);
-      console.log("✅ Ürün silme başarılı:", response.data);
+
       return response.data;
     } catch (error: any) {
       console.error(
@@ -846,7 +635,6 @@ export const productService = {
         error.response?.data
       );
 
-      // HTTP hata kodları
       if (error.response?.status === 403) {
         throw new Error(
           "Bu ürünü silme yetkiniz yok. Sadece kendi oluşturduğunuz ürünleri silebilirsiniz."
@@ -859,7 +647,6 @@ export const productService = {
         );
       }
 
-      // Genel hata
       throw new Error(
         error.response?.data?.message ||
           error.message ||

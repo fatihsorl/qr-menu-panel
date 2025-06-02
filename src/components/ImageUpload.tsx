@@ -92,7 +92,6 @@ export default function ImageUpload({
                 {label} {required && <span className="text-red-500">*</span>}
             </label>
 
-            {/* Yüklenen görsel preview */}
             {value && !uploading && (
                 <div className="relative inline-block">
                     <img
@@ -110,7 +109,6 @@ export default function ImageUpload({
                 </div>
             )}
 
-            {/* Upload area */}
             <div
                 className={`
           relative border-2 border-dashed rounded-lg p-6 text-center transition-colors

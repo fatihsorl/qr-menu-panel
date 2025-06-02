@@ -12,14 +12,10 @@ interface CloudinaryUploadResult {
   error?: string;
 }
 
-/**
- * Cloudinary'e görsel yükleme fonksiyonu
- */
 export const uploadImageToCloudinary = async (
   file: File
 ): Promise<CloudinaryUploadResult> => {
   try {
-    // Dosya boyut kontrolü (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
       return {
         success: false,
@@ -27,7 +23,6 @@ export const uploadImageToCloudinary = async (
       };
     }
 
-    // Dosya türü kontrolü
     if (!file.type.startsWith("image/")) {
       return {
         success: false,
@@ -37,7 +32,7 @@ export const uploadImageToCloudinary = async (
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "qr-menu-preset"); // Bu preset'i Cloudinary'de oluşturmanız gerekecek
+    formData.append("upload_preset", "qr-menu-preset");
     formData.append("folder", "qr-menu-images");
 
     const response = await fetch(
@@ -67,9 +62,6 @@ export const uploadImageToCloudinary = async (
   }
 };
 
-/**
- * Cloudinary URL'den optimized görsel URL oluşturma
- */
 export const getOptimizedImageUrl = (
   publicId: string,
   options: {
@@ -84,9 +76,6 @@ export const getOptimizedImageUrl = (
   return `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/w_${width},h_${height},c_fill,q_${quality},f_${format}/${publicId}`;
 };
 
-/**
- * Herhangi bir Cloudinary URL'i optimize eder (BASIT ÇÖZÜM)
- */
 export const optimizeCloudinaryUrl = (
   url: string,
   width: number = 400,
@@ -97,12 +86,10 @@ export const optimizeCloudinaryUrl = (
     return url;
   }
 
-  // Eğer zaten optimize edilmişse, tekrar optimize etme
   if (url.includes("/w_") || url.includes("/h_")) {
     return url;
   }
 
-  // URL'den public_id'yi çıkar ve optimize et
   const parts = url.split("/upload/");
   if (parts.length === 2) {
     const baseUrl = parts[0];
@@ -113,9 +100,6 @@ export const optimizeCloudinaryUrl = (
   return url;
 };
 
-/**
- * Dosya yükleme için drag & drop desteği
- */
 export const handleDragAndDrop = (
   e: React.DragEvent<HTMLDivElement>,
   onFileSelect: (file: File) => void

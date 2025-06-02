@@ -20,7 +20,7 @@ interface ProductWithInfo extends Product {
 
 export default function ProductsPage() {
     const searchParams = useSearchParams();
-    const urlLanguage = searchParams.get('language'); // URL'den language'ı al
+    const urlLanguage = searchParams.get('language');
 
     const [products, setProducts] = useState<ProductWithInfo[]>([]);
     const [loading, setLoading] = useState(true);
@@ -32,26 +32,20 @@ export default function ProductsPage() {
         imageUrl: ''
     });
 
-    // Language filter state - URL'den başlangıç değeri al
     const [selectedLanguage, setSelectedLanguage] = useState<string>(() => {
         const initialLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : 'tr';
-        console.log(`🚀 Ürünler sayfası başlatılıyor - URL Language: ${urlLanguage}, Seçilen: ${initialLanguage}`);
         return initialLanguage;
     });
 
-    // Fiyat input'u için ayrı state
     const [priceInputValue, setPriceInputValue] = useState('');
 
-    // Accordion state - hangi kategoriler açık
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
     const { user } = useAuthStore();
 
-    // URL'den language değiştiğinde state'i güncelle
     useEffect(() => {
         const urlLanguage = searchParams.get('language');
         if (urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) && urlLanguage !== selectedLanguage) {
-            console.log(`🔄 URL'den language değişti: ${selectedLanguage} → ${urlLanguage}`);
             setSelectedLanguage(urlLanguage);
         }
     }, [searchParams, selectedLanguage]);
@@ -60,37 +54,22 @@ export default function ProductsPage() {
         try {
             setLoading(true);
             if (user) {
-                // URL'den mevcut dili al
                 const urlLanguage = searchParams.get('language');
                 const currentLanguage = urlLanguage && ['tr', 'en', 'ru'].includes(urlLanguage) ? urlLanguage : selectedLanguage;
 
-                console.log(`🔍 loadAllData başlatıldı - Language: ${currentLanguage}`);
-
-                // Önce menüleri al
                 const menusResponse = await menuService.getMyMenus(currentLanguage);
                 if (menusResponse.isSucceed && menusResponse.data.length > 0) {
-                    console.log('🔍 Ürünler sayfası - API\'dan dönen tüm menüler:', menusResponse.data);
-                    console.log('🌐 Ürünler sayfası - Kullanılan dil:', currentLanguage);
-
-                    // Frontend'de dil filtrelemesi yap
                     const filteredMenus = menusResponse.data.filter(menu => menu.language === currentLanguage);
-
-                    console.log('✅ Ürünler sayfası - Frontend\'de filtrelenmiş menüler:', filteredMenus);
-                    console.log(`📊 Ürünler sayfası - Toplam ${menusResponse.data.length} menü, ${filteredMenus.length} tanesi "${currentLanguage}" dilinde`);
-
-                    // Her menü için kategorileri al
                     const allProducts: ProductWithInfo[] = [];
 
                     for (const menu of filteredMenus) {
                         try {
                             const categoriesResponse = await categoryService.getCategoriesByMenuId(menu.id, currentLanguage);
                             if (categoriesResponse.isSucceed) {
-                                // Her kategori için ürünleri al
                                 for (const category of categoriesResponse.data) {
                                     try {
                                         const productsResponse = await productService.getProductsByCategoryId(category.id, currentLanguage);
                                         if (productsResponse.isSucceed) {
-                                            // Her ürüne kategori ve menü bilgisini ekle
                                             const productsWithInfo = productsResponse.data.map(product => ({
                                                 ...product,
                                                 categoryName: category.name,
@@ -100,12 +79,10 @@ export default function ProductsPage() {
                                             allProducts.push(...productsWithInfo);
                                         }
                                     } catch {
-                                        console.log(`Kategori ${category.name} için ürün bulunamadı`);
                                     }
                                 }
                             }
                         } catch {
-                            console.log(`Menü ${menu.title} için kategori bulunamadı`);
                         }
                     }
                     setProducts(allProducts);
@@ -153,7 +130,6 @@ export default function ProductsPage() {
     const handleSaveEdit = async () => {
         if (!editingProduct || !editingProduct.categoryId) return;
 
-        // Fiyat input'undan price'ı al ve validate et
         const priceValue = parseFloat(priceInputValue) || 0;
 
         try {
@@ -191,7 +167,6 @@ export default function ProductsPage() {
         }).format(price);
     };
 
-    // Accordion toggle fonksiyonu
     const toggleCategoryExpansion = (key: string) => {
         setExpandedCategories(prev => {
             const newSet = new Set(prev);
@@ -204,7 +179,6 @@ export default function ProductsPage() {
         });
     };
 
-    // İlk yüklendiğinde eğer az kategori varsa otomatik aç
     useEffect(() => {
         if (products.length > 0) {
             const groupedProducts = products.reduce((groups, product) => {
@@ -225,7 +199,6 @@ export default function ProductsPage() {
 
             const categoryKeys = Object.keys(groupedProducts);
 
-            // Eğer 3 veya daha az kategori varsa otomatik aç
             if (categoryKeys.length <= 3) {
                 setExpandedCategories(new Set(categoryKeys));
             }
@@ -235,7 +208,6 @@ export default function ProductsPage() {
     return (
         <DashboardLayout>
             <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 mb-10">
-                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex flex-col gap-2">
                         <Link
@@ -251,7 +223,6 @@ export default function ProductsPage() {
                         </p>
                     </div>
 
-                    {/* Dil Seçici */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
                             Dil Seçin:
@@ -268,7 +239,6 @@ export default function ProductsPage() {
                     </div>
                 </div>
 
-                {/* Products List */}
                 <div className="space-y-6">
                     {loading ? (
                         <div className="flex items-center justify-center py-8">
@@ -279,7 +249,6 @@ export default function ProductsPage() {
                         </div>
                     ) : products.length > 0 ? (
                         (() => {
-                            // Ürünleri önce ana menü, sonra kategoriye göre grupla
                             const groupedProducts = products.reduce((groups, product) => {
                                 const menuTitle = product.menuTitle || 'Bilinmeyen Menü';
                                 const categoryName = product.categoryName || 'Bilinmeyen Kategori';
@@ -298,7 +267,6 @@ export default function ProductsPage() {
 
                             return Object.entries(groupedProducts).map(([key, { menuTitle, categoryName, products: groupProducts }]) => (
                                 <div key={key} className="space-y-4">
-                                    {/* Kategori Başlığı - Clickable */}
                                     <div
                                         onClick={() => toggleCategoryExpansion(key)}
                                         className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-4 border border-purple-200 cursor-pointer hover:from-purple-200 hover:to-pink-200 transition-all duration-200 hover:shadow-md select-none"
@@ -323,7 +291,6 @@ export default function ProductsPage() {
                                                     </p>
                                                 </div>
                                             </div>
-                                            {/* Açılır/Kapanır Icon */}
                                             <div className="flex items-center space-x-2">
                                                 <span className="text-sm text-gray-600 font-medium hidden sm:block">
                                                     {expandedCategories.has(key) ? 'Kapat' : 'Aç'}
@@ -335,14 +302,12 @@ export default function ProductsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Bu kategoriye ait ürünler - Conditional Rendering */}
                                     {expandedCategories.has(key) && (
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fadeIn">
                                             {groupProducts.map((product) => (
                                                 <div key={product.id} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                                                     <div className="p-4">
                                                         {editingProduct?.id === product.id ? (
-                                                            /* Düzenleme Formu */
                                                             <div className="space-y-3">
                                                                 <div>
                                                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -411,7 +376,6 @@ export default function ProductsPage() {
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            /* Normal Ürün Görünümü */
                                                             <div className="space-y-4">
                                                                 <div className="flex items-start space-x-4">
                                                                     {product.imageUrl ? (
@@ -428,7 +392,7 @@ export default function ProductsPage() {
                                                                     <div className="flex-1 min-w-0">
                                                                         <h3 className="text-lg font-semibold text-gray-900 mb-1">{product.name}</h3>
                                                                         <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">
-                                                                            {product.description || 'Açıklama bulunmuyor'}
+                                                                            {product.description}
                                                                         </p>
                                                                         <div className="flex items-center justify-between mt-3">
                                                                             <div className="text-xl font-bold text-green-600">
@@ -438,7 +402,6 @@ export default function ProductsPage() {
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Action Buttons */}
                                                                 <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-100">
                                                                     <button
                                                                         onClick={() => handleEditProduct(product)}

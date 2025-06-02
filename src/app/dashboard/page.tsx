@@ -17,7 +17,6 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(false);
     const { user } = useAuthStore();
 
-    // Form states
     const [menuForm, setMenuForm] = useState({
         title: '',
         description: '',
@@ -38,13 +37,10 @@ export default function DashboardPage() {
         price: 0
     });
 
-    // Fiyat input'u için ayrı state
     const [productPriceInput, setProductPriceInput] = useState('');
 
-    // Navigasyon fonksiyonları
     const goToStep = (step: number) => {
         setCurrentStep(step);
-        // Form temizleme (opsiyonel)
         if (step === 2) {
             setCategoryForm({ name: '', description: '', imageUrl: '' });
         } else if (step === 3) {
@@ -54,18 +50,6 @@ export default function DashboardPage() {
         }
     };
 
-    const resetAllForms = () => {
-        setMenuForm({ title: '', description: '', imageUrl: '', language: '' });
-        setCategoryForm({ name: '', description: '', imageUrl: '' });
-        setProductForm({ name: '', description: '', imageUrl: '', price: 0 });
-        setProductPriceInput('');
-        setCreatedMenu(null);
-        setCategories([]);
-        setSelectedCategory(null);
-        setCurrentStep(1);
-    };
-
-    // 1. Menü Oluşturma
     const handleCreateMenu = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!menuForm.title.trim()) {
@@ -82,7 +66,7 @@ export default function DashboardPage() {
             setLoading(true);
             const menuData: CreateMenuData = {
                 title: menuForm.title.trim(),
-                description: '', // Açıklama otomatik olarak boş gönderiliyor
+                description: '',
                 imageUrl: menuForm.imageUrl.trim(),
                 language: menuForm.language
             };
@@ -104,7 +88,6 @@ export default function DashboardPage() {
         }
     };
 
-    // 2. Kategori Oluşturma
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!categoryForm.name.trim() || !createdMenu) {
@@ -117,17 +100,10 @@ export default function DashboardPage() {
             const categoryData: CreateCategoryData = {
                 menuId: createdMenu.id,
                 name: categoryForm.name.trim(),
-                description: '', // Açıklama otomatik olarak boş gönderiliyor
+                description: '',
                 imageUrl: categoryForm.imageUrl.trim()
             };
-
-            // DEBUG: Gönderilen data'yı kontrol et
-            console.log('🔍 Kategori oluşturma - Gönderilen data:', categoryData);
-
             const response = await categoryService.createCategory(categoryData);
-
-            // DEBUG: API'dan dönen response'u kontrol et
-            console.log('📡 Kategori oluşturma - API response:', response);
 
             if (response.isSucceed) {
                 setCategories([...categories, response.data]);
@@ -144,11 +120,9 @@ export default function DashboardPage() {
         }
     };
 
-    // 3. Ürün Oluşturma
     const handleCreateProduct = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Fiyat değerini parse et
         const priceValue = parseFloat(productPriceInput) || 0;
 
         if (!productForm.name.trim() || !selectedCategory || priceValue <= 0) {
@@ -166,13 +140,7 @@ export default function DashboardPage() {
                 price: priceValue
             };
 
-            // DEBUG: Gönderilen data'yı kontrol et
-            console.log('🔍 Ürün oluşturma - Gönderilen data:', productData);
-
             const response = await productService.createProduct(productData);
-
-            // DEBUG: API'dan dönen response'u kontrol et
-            console.log('📡 Ürün oluşturma - API response:', response);
 
             if (response.isSucceed) {
                 setProductForm({ name: '', description: '', imageUrl: '', price: 0 });
@@ -192,15 +160,12 @@ export default function DashboardPage() {
     return (
         <DashboardLayout>
             <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
-                {/* Header */}
                 <div className="text-center px-4">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">QR Menü Yönetimi</h1>
                     <p className="text-gray-600 text-xs sm:text-base">Ana Kategori, Alt Kategori ve Ürünlerinizi 3 adımda oluşturun</p>
                 </div>
 
-                {/* Progress Steps - Mobile Responsive */}
                 <div className="px-4">
-                    {/* Mobile Version - Vertical */}
                     <div className="sm:hidden space-y-4">
                         {[
                             { step: 1, title: "Ana Kategori Oluştur", desc: "Temel bilgiler" },
@@ -225,7 +190,6 @@ export default function DashboardPage() {
                         ))}
                     </div>
 
-                    {/* Desktop Version - Horizontal */}
                     <div className="hidden sm:flex items-center justify-center space-x-4">
                         {[
                             { step: 1, title: "Menü" },
@@ -251,7 +215,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Step Content */}
                 {currentStep === 1 && (
                     <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mx-4 sm:mx-0">
 
@@ -308,7 +271,6 @@ export default function DashboardPage() {
                             </button>
                         </form>
 
-                        {/* Oluşturulan Menü Varsa Diğer Adımlara Geçiş */}
                         {createdMenu && (
                             <div className="mt-6 pt-4 border-t">
                                 <div className="flex items-center mb-3">
@@ -336,7 +298,7 @@ export default function DashboardPage() {
                     </div>
                 )}
 
-                {/* Step 2: Kategori Ekleme */}
+
                 {currentStep === 2 && (
                     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
@@ -428,7 +390,7 @@ export default function DashboardPage() {
                     </div>
                 )}
 
-                {/* Step 3: Ürün Ekleme */}
+
                 {currentStep === 3 && (
                     <div className="space-y-4 sm:space-y-6 px-4 sm:px-0">
                         <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
@@ -524,7 +486,6 @@ export default function DashboardPage() {
                                 </form>
                             )}
 
-                            {/* Navigasyon Butonları */}
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t">
                                 <button
                                     onClick={() => goToStep(1)}
